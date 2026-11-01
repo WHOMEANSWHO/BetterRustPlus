@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="RustPlusApi.Fcm.Registration" Version="2.0.0-beta.9" />
+    <InternalsVisibleTo Include="BetterRustPlus.Companion.Tests" />
+    <Compile Include="../Avalonia/src/RustPlusDesk.Core/Accounts/CompanionAccount.cs" Link="Accounts/CompanionAccount.cs" />
+    <Compile Include="../Avalonia/src/RustPlusDesk.Infrastructure/Accounts/CompanionAccountService.cs" Link="Accounts/CompanionAccountService.cs" />
+    <Compile Include="../Avalonia/src/RustPlusDesk.Infrastructure/Accounts/CompanionConfigFile.cs" Link="Accounts/CompanionConfigFile.cs" />
+    <Compile Include="../Avalonia/src/RustPlusDesk.Infrastructure/Accounts/CompanionToken.cs" Link="Accounts/CompanionToken.cs" />
+    <Compile Include="../Avalonia/src/RustPlusDesk.Infrastructure/Storage/AtomicPrivateFile.cs" Link="Storage/AtomicPrivateFile.cs" />
+  </ItemGroup>
+</Project>

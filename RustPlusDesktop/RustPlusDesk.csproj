@@ -367,6 +367,10 @@
     <ProjectReference Include="$(AuthSubmoduleProjectPath)" />
     <Compile Remove="Services\Auth\IRustCompanionAuthProvider.cs" />
     <Compile Remove="Services\Auth\PublicAuthCompatibility.cs" />
+    <Compile Remove="Services\Auth\WpfCompanionLoginBrowser.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="!Exists('$(AuthSubmoduleProjectPath)')">
+    <ProjectReference Include="..\BetterRustPlus.Companion\BetterRustPlus.Companion.csproj" />
   </ItemGroup>
 
     <ItemGroup>

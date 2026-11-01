@@ -33,6 +33,8 @@ jobs:
           npm run build
       - name: Test desktop code
         run: dotnet test RustPlusDesktop.Tests/RustPlusDesktop.Tests.csproj -c Release -p:SkipGeneticsLabBuild=true -p:UseSharedCompilation=false --logger trx
+      - name: Test companion pairing library offline
+        run: dotnet test BetterRustPlus.Companion.Tests/BetterRustPlus.Companion.Tests.csproj -c Release --logger trx
 
   alert-service:
     name: Linux alert service

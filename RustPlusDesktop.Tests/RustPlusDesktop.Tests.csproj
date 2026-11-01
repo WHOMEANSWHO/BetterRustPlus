@@ -20,5 +20,6 @@
   </ItemGroup>
   <ItemGroup Condition="Exists('..\Submodules\RustPlus.Auth\RustPlus.Auth.csproj')">
     <Compile Remove="PublicAuthCompatibilityTests.cs" />
+    <Compile Remove="WpfCompanionLoginBrowserTests.cs" />
   </ItemGroup>
 </Project>

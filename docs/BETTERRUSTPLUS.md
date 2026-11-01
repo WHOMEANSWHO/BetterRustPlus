@@ -6,6 +6,8 @@ Owner: WHOMEANSWHO. Repository: https://github.com/WHOMEANSWHO/BetterRustPlus. I
 
 ### Development progress — 1 November 2026
 
+The desktop opens with an isolated test profile. The integrated desktop suite passed 190 tests with one skipped. The repository's public Avalonia companion-account implementation is now shared with a .NET 8 companion library; its 22 existing account tests pass with fake browser and HTTP services. A WPF browser callback adapter has been added, but pairing has not yet been wired to it or verified against Steam or Rust+. Registration, companion relay and automatic repair remain unavailable in the desktop app until integration is completed and tested.
+
 The Windows desktop now compiles with public compatibility adapters. These explicitly report that companion registration and automatic repair are unavailable; they do not provide a working Rust+ login or companion relay token. Genetics Lab builds separately. Initial navigation improvements preserve settings location and add keyboard/focus support. BetterRustPlus uses separate data folders and a separate protocol, with an isolated workspace profile available for testing.
 
 A separate .NET 8 alert-service foundation accepts authenticated supplied events, supports dry-run rules for cargo, airdrops, Deep Sea, raids and teammate death grids, and can be configured for Discord webhooks. It is not connected to Rust+, not deployed, and does not yet detect game events or provide an interactive Discord bot. Delivery state is in memory and resets on restart. A busy sender returns a retryable response instead of indefinitely blocking other events.
