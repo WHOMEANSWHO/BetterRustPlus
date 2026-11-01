@@ -372,6 +372,9 @@
   <ItemGroup Condition="!Exists('$(AuthSubmoduleProjectPath)')">
     <ProjectReference Include="..\BetterRustPlus.Companion\BetterRustPlus.Companion.csproj" />
   </ItemGroup>
+  <PropertyGroup Condition="!Exists('$(AuthSubmoduleProjectPath)')">
+    <DefineConstants>$(DefineConstants);BETTER_PUBLIC_AUTH</DefineConstants>
+  </PropertyGroup>
 
     <ItemGroup>
       <!--

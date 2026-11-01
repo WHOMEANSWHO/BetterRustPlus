@@ -109,17 +109,25 @@ namespace RustPlusDesk.Services
                     return;
                 }
 
+#if BETTER_PUBLIC_AUTH
+                // The public registration service writes its own metadata atomically. Treat its
+                // 15-day expiry as an estimate and never overwrite the validated Steam identity.
+                var (issuedAt, expiresAt) = NativeFcmRegistrationService.ReadRegistrationMetadata(ConfigPath);
+                if (issuedAt.HasValue) TrackingService.FcmIssuedAt = issuedAt.Value;
+                if (expiresAt.HasValue) TrackingService.FcmExpiresAt = expiresAt.Value;
+#else
                 var issuedAt = DateTime.Now;
                 var expiresAt = issuedAt.AddDays(15);
                 TrackingService.FcmIssuedAt = issuedAt;
                 TrackingService.FcmExpiresAt = expiresAt;
                 EnrichFcmConfig(issuedAt, expiresAt, TrackingService.SteamId64);
+#endif
                 RegistrationCompleted?.Invoke(this, EventArgs.Empty);
             }
 
             if (!TryLoadCredentials(out var credentials))
             {
-                _log("[fcm-native] ❌ Could not read gcm.androidId/securityToken from config.");
+                _log("[fcm-native] Pairing configuration is incomplete or invalid. Existing data was kept. Open pairing recovery to re-pair or restore a backup.");
                 Failed?.Invoke(this, "invalid-config");
                 Stopped?.Invoke(this, EventArgs.Empty);
                 return;

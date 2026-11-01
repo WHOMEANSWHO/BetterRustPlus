@@ -6,13 +6,13 @@ Owner: WHOMEANSWHO. Repository: https://github.com/WHOMEANSWHO/BetterRustPlus. I
 
 ### Development progress — 1 November 2026
 
-The desktop opens with an isolated test profile. The integrated desktop suite passed 190 tests with one skipped. The repository's public Avalonia companion-account implementation is now shared with a .NET 8 companion library; its 22 existing account tests pass with fake browser and HTTP services. A WPF browser callback adapter has been added, but pairing has not yet been wired to it or verified against Steam or Rust+. Registration, companion relay and automatic repair remain unavailable in the desktop app until integration is completed and tested.
+The desktop opens with an isolated test profile. The integrated desktop suite passed 190 tests with one skipped before the latest pairing changes. The public companion-account library passed 22 offline tests. The WPF pairing flow now uses this library; six adapter tests pass, but real Steam/Rust+ pairing and companion relay have not been verified.
 
-The Windows desktop now compiles with public compatibility adapters. These explicitly report that companion registration and automatic repair are unavailable; they do not provide a working Rust+ login or companion relay token. Genetics Lab builds separately. Initial navigation improvements preserve settings location and add keyboard/focus support. BetterRustPlus uses separate data folders and a separate protocol, with an isolated workspace profile available for testing.
+The Windows desktop compiles with public companion adapters. Genetics Lab builds separately. Initial navigation improvements preserve settings location and add keyboard/focus support. BetterRustPlus uses separate data folders and a separate protocol, with an isolated workspace profile available for testing.
 
 A separate .NET 8 alert-service foundation accepts authenticated supplied events, supports dry-run rules for cargo, airdrops, Deep Sea, raids and teammate death grids, and can be configured for Discord webhooks. It is not connected to Rust+, not deployed, and does not yet detect game events or provide an interactive Discord bot. Delivery state is in memory and resets on restart. A busy sender returns a retryable response instead of indefinitely blocking other events.
 
-The GitHub fork exists, but these development changes remain local because the GitHub integration lacks write access. No installer has been released. Full pairing, 3D maps and automatic event detection remain outstanding.
+The GitHub fork and development branch exist. No installer has been released. Live pairing verification, 3D maps and automatic event detection remain outstanding.
 
 Preserve the upstream feature set and improve how people find and configure it. Keep C#/.NET 8 and WPF for the Windows desktop application. Keep the embedded Genetics Lab frontend in its existing TypeScript stack. A language rewrite would put feature parity at risk without solving navigation.
 
@@ -141,4 +141,7 @@ Keep the selected server and connection status visible. Use labelled navigation 
 
 ## Current verification
 
-The desktop compiles with the public compatibility adapters; authentication remains unavailable. Genetics Lab builds, and the alert-service tests run without sending Discord messages. Visual verification, full pairing and an installer remain outstanding.
+The desktop compiles with the public pairing adapters. Offline tests pass, but authentication has not been verified with a real Steam account. Genetics Lab builds, and the alert-service tests run without sending Discord messages. Full visual verification, live pairing and an installer remain outstanding.
+
+Latest full desktop rerun aborted after 82 passing tests when the WPF test host crashed in HwndSubclass.SubclassWndProc. The six focused pairing tests pass; full regression verification after pairing integration remains incomplete.
+

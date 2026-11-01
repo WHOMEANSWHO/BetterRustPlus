@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using RustPlusDesk.Core.Accounts;
 using RustPlusDesk.Services;
 
 namespace RustPlusDesktop.Tests;
@@ -7,140 +8,95 @@ namespace RustPlusDesktop.Tests;
 [DoNotParallelize]
 public sealed class PublicAuthCompatibilityTests
 {
-    private IRustCompanionAuthProvider? _originalProvider;
+    private Func<ICompanionAccountService>? previous;
+    private Action<string>? previousSetSteamId;
+    private string savedSteamId = "old-account";
+    private readonly FakeCompanion fake = new();
 
-    [TestInitialize]
-    public void UseUnavailableProvider()
+    [TestInitialize] public void Setup() { previous = PublicCompanion.CreateService; previousSetSteamId = PublicCompanion.SetSteamId; PublicCompanion.CreateService = () => fake; PublicCompanion.SetSteamId = value => savedSteamId = value; }
+    [TestCleanup] public void Cleanup() { if (previous is not null) PublicCompanion.CreateService = previous; if (previousSetSteamId is not null) PublicCompanion.SetSteamId = previousSetSteamId; }
+
+    [TestMethod]
+    public async Task RegistrationUsesRequestedConfigAndDoesNotOverwriteMetadata()
     {
-        if (typeof(NativeFcmRegistrationService).Assembly != typeof(CompanionAuthManager).Assembly)
-            Assert.Inconclusive("These tests cover the public compatibility build only.");
-
-        _originalProvider = CompanionAuthManager.Provider;
-        CompanionAuthManager.Provider = new UnavailableProvider();
-    }
-
-    [TestCleanup]
-    public void RestoreProvider()
-    {
-        if (_originalProvider is not null)
-            CompanionAuthManager.Provider = _originalProvider;
+        var messages = new List<string>();
+        bool ok = await NativeFcmRegistrationService.TryRegisterAsync("fixture-config.json", messages.Add);
+        Assert.IsTrue(ok);
+        Assert.AreEqual("76561198000000000", savedSteamId);
+        Assert.AreEqual("fixture-config.json", fake.Path);
+        NativeFcmRegistrationService.StampConfigMetadata("missing-fixture.json", DateTime.Now, DateTime.Now, "stale-id", messages.Add);
+        Assert.IsFalse(File.Exists("missing-fixture.json"));
     }
 
     [TestMethod]
-    public async Task UnsupportedRegistrationPreservesSuppliedConfiguration()
+    public async Task MissingSteamIdentityClearsStaleIdentityAndFailsClosed()
+    {
+        fake.SteamId = "";
+        var messages = new List<string>();
+        Assert.IsFalse(await NativeFcmRegistrationService.TryRegisterAsync("fixture.json", messages.Add));
+        Assert.AreEqual("", savedSteamId);
+        StringAssert.Contains(string.Join(" ", messages), "Registration was saved");
+    }
+
+    [TestMethod]
+    public async Task RejectedAndCancelledRegistrationsDoNotReportSuccess()
+    {
+        fake.Failure = new CompanionAccountException(AccountFailure.Rejected);
+        Assert.IsFalse(await NativeFcmRegistrationService.TryRegisterAsync("fixture.json", _ => { }));
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () => await NativeFcmRegistrationService.TryRegisterAsync("fixture.json", _ => { }, ct: cancel.Token));
+    }
+
+    [TestMethod]
+    public async Task MetadataIsReadFromCommittedConfigWithoutChangingIdentity()
     {
         var directory = Path.Combine(Path.GetTempPath(), "BetterRustPlusTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         var path = Path.Combine(directory, "fixture.json");
-        const string fixture = "{\"test_fixture\":true}";
-        await File.WriteAllTextAsync(path, fixture);
-        var messages = new List<string>();
-
+        const string content = "{\"steam_id\":\"123\",\"issue_date\":\"2026-01-02T03:04:05Z\",\"expiry_date\":\"2026-01-17T03:04:05Z\"}";
         try
         {
-            var registered = await NativeFcmRegistrationService.TryRegisterAsync(path, messages.Add);
-
-            Assert.IsFalse(registered);
-            Assert.AreEqual(fixture, await File.ReadAllTextAsync(path));
-            StringAssert.Contains(string.Join(" ", messages), "unavailable");
+            await File.WriteAllTextAsync(path, content);
+            var dates = NativeFcmRegistrationService.ReadRegistrationMetadata(path);
+            Assert.IsNotNull(dates.IssuedAt);
+            Assert.IsNotNull(dates.ExpiresAt);
+            NativeFcmRegistrationService.StampConfigMetadata(path, DateTime.Now, DateTime.Now, "old-id", _ => { });
+            Assert.AreEqual(content, await File.ReadAllTextAsync(path));
         }
-        finally
-        {
-            File.Delete(path);
-            Directory.Delete(directory);
-        }
+        finally { File.Delete(path); Directory.Delete(directory); }
     }
 
     [TestMethod]
-    public async Task UnsupportedRepairDoesNotReportRenewedCredentials()
+    public async Task UnconfirmedLogoutThrowsBeforeLegacyCallerCanDeleteConfig()
     {
-        var messages = new List<string>();
-        var repair = await FcmRepairService.TryRepairAsync(messages.Add);
-
-        Assert.AreEqual(FcmRepairService.RepairOutcome.Unavailable, repair.Outcome);
-        StringAssert.Contains(repair.Detail, "have not been changed");
+        fake.SignOutResult = CompanionSignOutResult.LocalOnly;
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(async () => await RustCompanionAuthService.LogoutCurrentDeviceAsync());
+        fake.SignOutResult = CompanionSignOutResult.RemoteCompletedLocalCleanupFailed;
+        await Assert.ThrowsExceptionAsync<InvalidOperationException>(async () => await RustCompanionAuthService.LogoutAllDevicesAsync());
+        fake.SignOutResult = CompanionSignOutResult.Completed;
+        Assert.IsTrue((await RustCompanionAuthService.LogoutAllDevicesAsync()).Success);
     }
 
     [TestMethod]
-    public async Task UnsupportedLogoutThrowsBeforeLegacyCallerCanClearConfiguration()
+    public async Task RepairAndStatusRespectActualProviderResults()
     {
-        var reachedCleanup = false;
-
-        await Assert.ThrowsExceptionAsync<NotSupportedException>(async () =>
-        {
-            await RustCompanionAuthService.LogoutCurrentDeviceAsync();
-            reachedCleanup = true;
-        });
-
-        Assert.IsFalse(reachedCleanup);
-        await Assert.ThrowsExceptionAsync<NotSupportedException>(async () =>
-            await RustCompanionAuthService.LogoutAllDevicesAsync());
+        fake.State = AccountState.Expired;
+        Assert.AreEqual(RustPlusTokenStatus.Expired, (await RustCompanionAuthService.CheckTokenStatusAsync()).Status);
+        Assert.AreEqual(FcmRepairService.RepairOutcome.Unavailable, (await FcmRepairService.TryRepairAsync(_ => { })).Outcome);
+        fake.Failure = new CompanionAccountException(AccountFailure.Rejected);
+        Assert.AreEqual(FcmRepairService.RepairOutcome.NeedsFullRePair, (await FcmRepairService.TryRepairAsync(_ => { })).Outcome);
     }
 
-    [TestMethod]
-    public async Task FailedLogoutFromAvailableProviderAlsoStopsLegacyCleanup()
+    private sealed class FakeCompanion : ICompanionAccountService
     {
-        CompanionAuthManager.Provider = new FailedLogoutProvider();
-        var reachedCleanup = false;
-
-        await Assert.ThrowsExceptionAsync<InvalidOperationException>(async () =>
-        {
-            await RustCompanionAuthService.LogoutCurrentDeviceAsync();
-            reachedCleanup = true;
-        });
-
-        Assert.IsFalse(reachedCleanup);
-    }
-
-    [TestMethod]
-    public async Task UnavailableProviderCannotProduceValidTokenOrRelayCredential()
-    {
-        var result = await RustCompanionAuthService.CheckTokenStatusAsync();
-
-        Assert.AreEqual(RustPlusTokenStatus.Missing, result.Status);
-        Assert.IsNull(RustCompanionAuthService.ReadCurrentToken());
-    }
-
-    [TestMethod]
-    public async Task CancellationStopsRegistrationRepairAndLogoutBeforeAnyWork()
-    {
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        var messages = new List<string>();
-
-        await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
-            await NativeFcmRegistrationService.TryRegisterAsync("unused-fixture.json", messages.Add, ct: cancellation.Token));
-        await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
-            await FcmRepairService.TryRepairAsync(messages.Add, cancellation.Token));
-        await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
-            await RustCompanionAuthService.LogoutCurrentDeviceAsync(ct: cancellation.Token));
-        await Assert.ThrowsExceptionAsync<OperationCanceledException>(async () =>
-            await RustCompanionAuthService.CheckTokenStatusAsync(ct: cancellation.Token));
-        Assert.AreEqual(0, messages.Count);
-    }
-
-    private class UnavailableProvider : IRustCompanionAuthProvider
-    {
-        public virtual bool IsAvailable => false;
-
-        public Task<bool> RunRegistrationFlowAsync(Action<string> log, CancellationToken ct = default)
-            => throw new AssertFailedException("The unavailable provider must not register.");
-
-        public Task<RustPlusTokenCheckResult> CheckTokenStatusAsync(string? token = null, CancellationToken ct = default)
-            => Task.FromResult(new RustPlusTokenCheckResult(RustPlusTokenStatus.Missing, "Unavailable test provider", 0, 0, null, null));
-
-        public virtual Task<(bool Success, string Message)> LogoutCurrentDeviceAsync(string? deviceId = null, CancellationToken ct = default)
-            => throw new AssertFailedException("The unavailable provider must not revoke sessions.");
-
-        public virtual Task<(bool Success, string Message)> LogoutAllDevicesAsync(CancellationToken ct = default)
-            => throw new AssertFailedException("The unavailable provider must not revoke sessions.");
-    }
-
-    private sealed class FailedLogoutProvider : UnavailableProvider
-    {
-        public override bool IsAvailable => true;
-
-        public override Task<(bool Success, string Message)> LogoutCurrentDeviceAsync(string? deviceId = null, CancellationToken ct = default)
-            => Task.FromResult((false, "Remote logout failed in test fixture."));
+        public string? Path;
+        public AccountState State = AccountState.Active;
+        public string SteamId = "76561198000000000";
+        public CompanionSignOutResult SignOutResult = CompanionSignOutResult.Completed;
+        public Exception? Failure;
+        public Task<CompanionAccount> CheckAsync(string path, CancellationToken ct) => Task.FromResult(new CompanionAccount(State));
+        public Task<CompanionAccount> SignInAsync(string path, CancellationToken ct) { Path = path; if (Failure is not null) throw Failure; return Task.FromResult(new CompanionAccount(State, SteamId)); }
+        public Task<CompanionAccount> RenewPushAsync(string path, CancellationToken ct) { if (Failure is not null) throw Failure; return Task.FromResult(new CompanionAccount(State)); }
+        public Task<CompanionSignOutResult> SignOutAsync(string path, CompanionSignOutScope scope, CancellationToken ct) => Task.FromResult(SignOutResult);
     }
 }

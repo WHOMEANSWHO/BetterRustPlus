@@ -2,7 +2,7 @@
 
 An unofficial Rust+ desktop companion by WHOMEANSWHO, forked from [Pronwan/rustplus-desktop](https://github.com/Pronwan/rustplus-desktop). The goal is to preserve the original features while making menus clearer and easier to navigate.
 
-**Development status:** initial fork setup. There is no BetterRustPlus installer release yet. Public-source compilation is currently blocked by missing private authentication classes; 3D maps also require the separately licensed MapParser. See [the development brief](docs/BETTERRUSTPLUS.md) for the navigation proposal, dependency findings and release work remaining.
+**Development status:** there is no BetterRustPlus installer release yet. A public-source pairing implementation is integrated and covered by offline tests; real Steam/Rust+ pairing has not been verified. 3D maps require a replacement for the separately licensed MapParser. See [the development brief](docs/BETTERRUSTPLUS.md) for the navigation proposal, dependency findings and release work remaining.
 
 New default layouts show navigation labels and expanded Tools. Existing saved preferences are respected. App update checks target this fork's releases.
 

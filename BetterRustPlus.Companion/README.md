@@ -4,6 +4,6 @@ This .NET 8 library links the existing public account implementation from `Avalo
 
 The service validates the login callback, checks the resulting token with Facepunch, registers push credentials, saves the paired configuration atomically and rolls back a new device registration on save failure. The linked offline tests use fake HTTP, fake browser and temporary fixture data; they do not verify live pairing.
 
-This foundation is not connected to the legacy WPF pairing button yet. `WpfCompanionLoginBrowser` is an unverified browser adapter; the current public compatibility fallback still reports pairing unavailable. Live pairing, WPF integration, credential lifetime and a Linux/VPS handoff remain future work.
+The WPF pairing flow now uses this service and an isolated WebView2 login adapter. Registration, renewal and failure handling have offline tests; no real Steam login or Rust+ connection has been verified. Credential lifetime and Linux/VPS handoff need further work.
 
 Run offline account tests with `dotnet test BetterRustPlus.Companion.Tests/BetterRustPlus.Companion.Tests.csproj`.
