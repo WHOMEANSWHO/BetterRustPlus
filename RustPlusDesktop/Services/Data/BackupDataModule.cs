@@ -58,8 +58,7 @@ namespace RustPlusDesk.Services.Data
 
                 // 2b. Copy rustplusjs-config.json
                 string fcmConfigPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                    "RustPlusDesk", "rustplusjs-config.json");
+                    RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
                 if (File.Exists(fcmConfigPath))
                 {
                     File.Copy(fcmConfigPath, Path.Combine(tempDir, "rustplusjs-config.json"), true);
@@ -67,8 +66,7 @@ namespace RustPlusDesk.Services.Data
 
                 // 3. Copy custom_crosshairs.json
                 string crosshairPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "RustPlusDesk", "custom_crosshairs.json");
+                    RustPlusDesk.Services.AppDataPaths.LocalDirectory, "custom_crosshairs.json");
                 if (File.Exists(crosshairPath))
                 {
                     File.Copy(crosshairPath, Path.Combine(tempDir, "custom_crosshairs.json"), true);
@@ -241,8 +239,7 @@ namespace RustPlusDesk.Services.Data
                 if (File.Exists(stagingFcm))
                 {
                     string targetFcm = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                        "RustPlusDesk", "rustplusjs-config.json");
+                        RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
                     string? targetDir = Path.GetDirectoryName(targetFcm);
                     if (targetDir != null)
                     {
@@ -300,8 +297,7 @@ namespace RustPlusDesk.Services.Data
                 if (File.Exists(stagingCrosshairs))
                 {
                     string targetCrosshairs = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "RustPlusDesk", "custom_crosshairs.json");
+                        RustPlusDesk.Services.AppDataPaths.LocalDirectory, "custom_crosshairs.json");
                     string? targetDir = Path.GetDirectoryName(targetCrosshairs);
                     if (targetDir != null)
                     {

@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -27,8 +27,8 @@ namespace RustPlusDesk;
 public partial class App : Application
 {
     private static Mutex? _single;
-    private const string SingleMutexName = "RustPlusDesk_SingleInstance";
-    private const string PipeName = "RustPlusDeskLinkPipe";
+    private const string SingleMutexName = "BetterRustPlus_SingleInstance";
+    private const string PipeName = "BetterRustPlusLinkPipe";
 
     private MainWindow? _main;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
@@ -102,7 +102,7 @@ public partial class App : Application
             if (!createdNew)
             {
                 // Another instance is running
-                if (args.Length > 0 && args[0].StartsWith("rustplus://", StringComparison.OrdinalIgnoreCase))
+                if (args.Length > 0 && IsCompanionLink(args[0]))
                     _ = SendLinkToRunningInstanceAsync(args[0]);
                 else if (!isBackgroundArg)
                     _ = SendCommandToRunningInstanceAsync("SHOWUI");
@@ -112,7 +112,7 @@ public partial class App : Application
                 return;
             }
 
-            UpdateSplashStatus(splash, splashDispatcher, "Connecting to Rust+…");
+            UpdateSplashStatus(splash, splashDispatcher, "Starting BetterRustPlus…");
             _ = Services.Cloud.CloudAuth.InitializeAsync();
 
             UpdateSplashStatus(splash, splashDispatcher, "Preparing system tray…");
@@ -139,7 +139,7 @@ public partial class App : Application
 
             bool shouldShowMain = !isBackgroundArg
                 || !TrackingService.StartMinimizedEnabled
-                || (args.Length > 0 && args[0].StartsWith("rustplus://", StringComparison.OrdinalIgnoreCase));
+                || (args.Length > 0 && IsCompanionLink(args[0]));
 
             var mainReadyTcs = new TaskCompletionSource<bool>();
             WindowState targetState = WindowState.Normal;
@@ -199,17 +199,21 @@ public partial class App : Application
 
             _ = StartPipeServerAsync();
 
-            if (args.Length > 0 && args[0].StartsWith("rustplus://", StringComparison.OrdinalIgnoreCase))
+            if (args.Length > 0 && IsCompanionLink(args[0]))
                 _main?.HandleRustPlusLink(args[0]);
 
-            _ = Task.Run(async () => { await Task.Delay(5000); CleanupLegacyInnoSetupInstallation(); });
             _ = Task.Run(CleanupLegacyNodeRuntime);
             _ = Task.Run(async () => { await Task.Delay(1000); EnsureUrlProtocolRegistered(); });
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[Startup] Exception during startup: {ex}");
-            try { System.IO.File.WriteAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "rp_startup_error.txt"), DateTime.Now + "\n" + ex); } catch { }
+            try
+            {
+                Directory.CreateDirectory(AppDataPaths.TempDirectory);
+                File.WriteAllText(Path.Combine(AppDataPaths.TempDirectory, "startup-error.txt"), DateTime.Now + "\n" + ex);
+            }
+            catch { }
             FadeAndCloseSplash(splash, splashDispatcher);
             if (_main != null)
             {
@@ -390,13 +394,18 @@ public partial class App : Application
         base.OnExit(e);
     }
 
+    private static bool IsCompanionLink(string link) =>
+        link.StartsWith("rustplus://", StringComparison.OrdinalIgnoreCase) ||
+        link.StartsWith("betterrustplus://", StringComparison.OrdinalIgnoreCase);
+
     private static void EnsureUrlProtocolRegistered()
     {
+        if (AppDataPaths.UsesCustomDataRoot) return;
         try
         {
-            const string scheme = "rustplus";
+            const string scheme = "betterrustplus";
             using var key = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{scheme}");
-            key.SetValue("", "URL: rustplus Protocol");
+            key.SetValue("", "URL: BetterRustPlus Protocol");
             key.SetValue("URL Protocol", "");
             using var shell = key.CreateSubKey(@"shell\open\command");
             var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName!;
@@ -549,7 +558,7 @@ public partial class App : Application
                     {
                         if (link == "SHOWUI")
                             ShowMainWindow();
-                        else if (link.StartsWith("rustplus://", StringComparison.OrdinalIgnoreCase))
+                        else if (IsCompanionLink(link))
                         {
                             ShowMainWindow();
                             _main.HandleRustPlusLink(link);
@@ -570,8 +579,7 @@ public partial class App : Application
         try
         {
             var path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "RustPlusDesk", "runtime", "rustplus-cli");
+                RustPlusDesk.Services.AppDataPaths.LocalDirectory, "runtime", "rustplus-cli");
             if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
         }
         catch (Exception ex)
@@ -580,55 +588,4 @@ public partial class App : Application
         }
     }
 
-    private static void CleanupLegacyInnoSetupInstallation()
-    {
-        try
-        {
-            string baseDir = AppContext.BaseDirectory;
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            if (!baseDir.StartsWith(localAppData, StringComparison.OrdinalIgnoreCase))
-                return;
-
-            string[] possibleKeys = new[]
-            {
-                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{E8E0C4C1-2E2F-4D2D-9BE7-3B19F0C1ABCD}}_is1",
-                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{E8E0C4C1-2E2F-4D2D-9BE7-3B19F0C1ABCD}_is1"
-            };
-
-            string? uninstallString = null;
-            foreach (var keyPath in possibleKeys)
-            {
-                using (var baseKey64 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64))
-                using (var subKey64 = baseKey64.OpenSubKey(keyPath))
-                    uninstallString = subKey64?.GetValue("UninstallString")?.ToString();
-
-                if (string.IsNullOrEmpty(uninstallString))
-                {
-                    using (var baseKey32 = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry32))
-                    using (var subKey32 = baseKey32.OpenSubKey(keyPath))
-                        uninstallString = subKey32?.GetValue("UninstallString")?.ToString();
-                }
-
-                if (!string.IsNullOrEmpty(uninstallString))
-                    break;
-            }
-
-            if (string.IsNullOrEmpty(uninstallString)) return;
-
-            string uninstallerExe = uninstallString.Replace("\"", "").Trim();
-            if (!File.Exists(uninstallerExe)) return;
-
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = uninstallerExe,
-                Arguments = "/SILENT /SUPPRESSMSGBOXES /NORESTART",
-                UseShellExecute = true,
-                Verb = "runas"
-            });
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to trigger legacy cleanup: {ex.Message}");
-        }
-    }
 }

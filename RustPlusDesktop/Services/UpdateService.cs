@@ -15,8 +15,8 @@ namespace RustPlusDesk.Services
 {
     public class UpdateService
     {
-        private const string RepoOwner = "Pronwan";
-        private const string RepoName = "rustplus-desktop";
+        private const string RepoOwner = "WHOMEANSWHO";
+        private const string RepoName = "BetterRustPlus";
         private const string PendingVelopackUpdateMarker = "velopack-pending";
         private const string InstallerAssetName = "RustPlusDesk-Setup.exe";
 
@@ -307,7 +307,7 @@ namespace RustPlusDesk.Services
 
         public void CleanupPartFiles()
         {
-            var target = Path.Combine(Path.GetTempPath(), InstallerAssetName);
+            var target = Path.Combine(AppDataPaths.TempDirectory, InstallerAssetName);
             for (int i = 0; i < _downloadChunksCount; i++)
             {
                 string partPath = $"{target}.part{i}";
@@ -324,13 +324,14 @@ namespace RustPlusDesk.Services
 
         private async Task<string?> DownloadExeInstallerAsync(string url, IProgress<DownloadReport>? progress = null)
         {
-            var target = Path.Combine(Path.GetTempPath(), InstallerAssetName);
+            var target = Path.Combine(AppDataPaths.TempDirectory, InstallerAssetName);
             CurrentDownloadFile = InstallerAssetName;
             _downloadCts = new CancellationTokenSource();
             var token = _downloadCts.Token;
 
             try
             {
+                Directory.CreateDirectory(AppDataPaths.TempDirectory);
                 using var http = new HttpClient(new TrafficTrackingHttpMessageHandler("Updates"))
                 {
                     // No wall-clock limit. The default is 100 seconds and it covers the whole

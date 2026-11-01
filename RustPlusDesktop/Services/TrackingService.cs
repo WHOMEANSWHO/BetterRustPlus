@@ -101,7 +101,7 @@ public class TrackingSettings
     public double SidebarWidth { get; set; } = 420;
     public bool SidebarPinned { get; set; } = true;
     /// <summary>Sidebar rail shows a name beside each icon (wider rail). Off: icons only.</summary>
-    public bool RailShowLabels { get; set; }
+    public bool RailShowLabels { get; set; } = true;
     public double WindowWidth { get; set; } = 1280;
     public double WindowHeight { get; set; } = 720;
     public double WindowLeft { get; set; } = double.NaN;
@@ -232,15 +232,12 @@ public static class TrackingService
 {
     private static readonly HttpClient _http = new(new TrafficTrackingHttpMessageHandler());
     private static readonly string _dbPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), 
-        "RustPlusDesk", "tracked_players.json");
+        RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "tracked_players.json");
     private static readonly string _settingsPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RustPlusDesk", "tracking_settings.json");
+        RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "tracking_settings.json");
 
     private static readonly string _fcmConfigPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RustPlusDesk", "rustplusjs-config.json");
+        RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
 
     public static bool IsFcmConfigured()
         => File.Exists(_fcmConfigPath) && new FileInfo(_fcmConfigPath).Length > 50;
@@ -422,8 +419,7 @@ public static class TrackingService
         try
         {
             var logPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "RustPlusDesk", "tracking_log.txt");
+                RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "tracking_log.txt");
             var dir = Path.GetDirectoryName(logPath);
             if (dir != null && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
             File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}");
@@ -1289,13 +1285,15 @@ public static class TrackingService
 
     private static void SetAutoStart(bool enabled)
     {
+        // A workspace preview must not change this account's Windows startup configuration.
+        if (AppDataPaths.UsesCustomDataRoot) return;
         try
         {
             const string runKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(runKey, true);
             if (key == null) return;
 
-            string appName = "RustPlusDesk";
+            string appName = AppDataPaths.ApplicationName;
             if (enabled)
             {
                 string exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule!.FileName!;

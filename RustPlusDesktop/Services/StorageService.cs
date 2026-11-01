@@ -14,7 +14,7 @@ public static class StorageService
     }
 
     public static string GetProfilesPath() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RustPlusDesk", "profiles.json");
+        Path.Combine(RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "profiles.json");
 
     public static List<ServerProfile> LoadProfiles()
     {

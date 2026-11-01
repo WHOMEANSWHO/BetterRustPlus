@@ -71,8 +71,7 @@ public sealed class DeviceHotkeyDisplayConverter : IMultiValueConverter
     private static IReadOnlyDictionary<string, List<long>>? LoadHotkeys(ServerProfile profile)
     {
         var path = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk",
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory,
             "hotkeys.json");
 
         if (!System.IO.File.Exists(path))

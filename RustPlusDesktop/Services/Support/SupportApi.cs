@@ -264,7 +264,7 @@ public static class SupportApi
         return null;
     }
 
-    private static string CacheDir => Path.Combine(Path.GetTempPath(), "rpd-tickets", "cache");
+    private static string CacheDir => Path.Combine(RustPlusDesk.Services.AppDataPaths.TempDirectory, "support", "cache");
 
     /// <summary>
     /// Seeds the attachment cache from a file the client itself uploaded, so its thumbnail comes
@@ -337,7 +337,7 @@ public static class SupportApi
             }
         }
 
-        var dir = Path.Combine(Path.GetTempPath(), "rpd-tickets");
+        var dir = Path.Combine(RustPlusDesk.Services.AppDataPaths.TempDirectory, "support");
         Directory.CreateDirectory(dir);
         var path = Path.Combine(dir, safe);
         await File.WriteAllBytesAsync(path, bytes).ConfigureAwait(false);

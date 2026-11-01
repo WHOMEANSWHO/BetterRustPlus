@@ -31,7 +31,7 @@ public static class ServerLocalDataCleanup
             isOffline || serverStillUsed,
             Map3DLocalBuildService.GetPreparedFolderPath(deleted, deleted.RustMapsMapId),
             DataManager.AppDir,
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RustPlusDesk"));
+            Path.Combine(RustPlusDesk.Services.AppDataPaths.LocalDirectory));
     }
 
     /// <summary>

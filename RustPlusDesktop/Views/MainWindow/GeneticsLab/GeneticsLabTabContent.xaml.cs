@@ -229,8 +229,7 @@ namespace RustPlusDesk.Views
                 _content = GeneticsLabContentService.Instance.ResolveContent();
 
                 string webViewDataFolder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "RustPlusDesk",
+                    RustPlusDesk.Services.AppDataPaths.LocalDirectory,
                     "WebView2_GeneticsLab");
 
                 Directory.CreateDirectory(webViewDataFolder);

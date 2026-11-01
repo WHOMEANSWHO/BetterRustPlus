@@ -31,7 +31,7 @@ namespace RustPlusDesk.Services.Data
         }
 
         public static string AppDir =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RustPlusDesk");
+            Path.Combine(RustPlusDesk.Services.AppDataPaths.RoamingDirectory);
 
         public static string ProfilesPath => Path.Combine(AppDir, "profiles.json");
 

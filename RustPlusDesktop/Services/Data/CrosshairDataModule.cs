@@ -9,8 +9,7 @@ namespace RustPlusDesk.Services.Data
     public static class CrosshairDataModule
     {
         private static readonly string SavePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "RustPlusDesk", "custom_crosshairs.json");
+            RustPlusDesk.Services.AppDataPaths.LocalDirectory, "custom_crosshairs.json");
 
         public static List<CustomCrosshair> LoadCrosshairs()
         {

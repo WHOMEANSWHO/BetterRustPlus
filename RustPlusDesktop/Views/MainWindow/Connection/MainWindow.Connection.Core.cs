@@ -172,8 +172,7 @@ public partial class MainWindow
         try
         {
             var dataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "RustPlusDesk", "WebView2");
+                RustPlusDesk.Services.AppDataPaths.LocalDirectory, "WebView2");
             Directory.CreateDirectory(dataFolder);
 
             // Pre-warm the CoreWebView2 environment in the background so that features

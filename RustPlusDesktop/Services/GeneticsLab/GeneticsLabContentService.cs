@@ -84,8 +84,7 @@ namespace RustPlusDesk.Services.GeneticsLab
         private GeneticsLabContentService()
         {
             _rootDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "RustPlusDesk",
+                RustPlusDesk.Services.AppDataPaths.LocalDirectory,
                 "GeneticsLab");
             _versionsDir = Path.Combine(_rootDir, "versions");
 

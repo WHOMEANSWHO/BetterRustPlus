@@ -9,8 +9,7 @@ namespace RustPlusDesk.Services
     public static class AlertTemplateService
     {
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk",
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory,
             "custom_alerts.json"
         );
 

@@ -423,8 +423,7 @@ private bool _overlayToolsVisible = false;
     private string GetOverlayPngPathForPlayer(ulong steamId)
     {
         var baseDir = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk",
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory,
             "Overlays",
             GetServerKey()
         );

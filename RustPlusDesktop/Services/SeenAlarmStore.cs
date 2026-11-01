@@ -35,8 +35,7 @@ internal static class SeenAlarmStore
     private const int MaxEntries = 500;
 
     private static string StorePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RustPlusDesk", "seen-alarms.json");
+        RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "seen-alarms.json");
 
     /// <summary>
     /// Records an alarm as shown and reports whether it was new.

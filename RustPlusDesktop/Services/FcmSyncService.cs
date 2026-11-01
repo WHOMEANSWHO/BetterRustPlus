@@ -14,8 +14,7 @@ namespace RustPlusDesk.Services
     {
         /// <summary>Local rustplus.js FCM credentials, the source of truth for what gets uploaded.</summary>
         public static string ConfigPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk", "rustplusjs-config.json");
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
 
         public static async Task<bool> SyncFcmCredentialsAsync()
         {

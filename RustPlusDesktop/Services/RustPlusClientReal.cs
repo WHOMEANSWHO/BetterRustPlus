@@ -2668,8 +2668,9 @@ public sealed class RustPlusClientReal : IRustPlusClient, IDisposable
                 if (bytes != null && LooksLikeImage(bytes))
                 {
                     Log($"Pfad1 OK: {bytes.Length} Bytes ({(bytes[0] == 0x89 ? "PNG" : "JPG/Other")}).");
-                    File.WriteAllBytes(Path.Combine(Path.GetTempPath(), "rust_map_debug.jpg"), bytes);
-                    Log("Map gespeichert unter: " + Path.Combine(Path.GetTempPath(), "rust_map_debug.jpg"));
+                    Directory.CreateDirectory(AppDataPaths.TempDirectory);
+                    File.WriteAllBytes(Path.Combine(AppDataPaths.TempDirectory, "rust_map_debug.jpg"), bytes);
+                    Log("Map gespeichert unter: " + Path.Combine(AppDataPaths.TempDirectory, "rust_map_debug.jpg"));
                     var bmp = ToBitmap(bytes);
                     if (bmp != null) return bmp;
                 }

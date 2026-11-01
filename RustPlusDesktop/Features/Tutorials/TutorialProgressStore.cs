@@ -32,7 +32,7 @@ public sealed class TutorialProgressStore : ITutorialProgressStore
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     public TutorialProgressStore(string? path = null) =>
-        _path = path ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RustPlusDesk", "tutorial-progress.json");
+        _path = path ?? Path.Combine(RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "tutorial-progress.json");
 
     public async Task<TutorialProgress> GetAsync(TutorialDefinition definition, CancellationToken cancellationToken = default)
     {

@@ -47,8 +47,7 @@ namespace RustPlusDesk.Services.AiCompanion
         public const int MaxEntries = 20;
 
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk", "ai-history.json");
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "ai-history.json");
 
         private static List<AiExchange>? _cached;
 

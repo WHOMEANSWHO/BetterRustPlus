@@ -27,13 +27,13 @@
 	<PropertyGroup>
 		<!-- Single source of truth for app, assembly, package, UI, and installer versioning. -->
 		<Version>10.3.0</Version>
-		<Title>Rust+ Desk</Title>
-		<Authors>Pronwan</Authors>
+		<Title>BetterRustPlus</Title>
+		<Authors>WHOMEANSWHO; Pronwan</Authors>
 		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 		
 		<!-- (optional, hübsch im Datei-Eigenschaften-Dialog) -->
 		<AssemblyTitle>RustPlusDesk</AssemblyTitle>
-		<Product>RustPlusDesk</Product>
+		<Product>BetterRustPlus</Product>
 	</PropertyGroup>
 	
 	<!-- Ticket notification chime. Copied to output (played by MediaPlayer, which needs a file
@@ -366,6 +366,7 @@
   <ItemGroup Condition="Exists('$(AuthSubmoduleProjectPath)')">
     <ProjectReference Include="$(AuthSubmoduleProjectPath)" />
     <Compile Remove="Services\Auth\IRustCompanionAuthProvider.cs" />
+    <Compile Remove="Services\Auth\PublicAuthCompatibility.cs" />
   </ItemGroup>
 
     <ItemGroup>

@@ -199,8 +199,7 @@ public partial class MainWindow
 
     // ── Map disk-cache helpers ─────────────────────────────────────────────────────────────────
     private static readonly string s_mapCacheDir = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "RustPlusDesk", "map_cache");
+        RustPlusDesk.Services.AppDataPaths.LocalDirectory, "map_cache");
 
     private static string MapCacheKey(string host, int port)
     {

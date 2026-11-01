@@ -1,0 +1,48 @@
+name: BetterRustPlus public checks
+
+on:
+  push:
+    branches: [master, 'betterrustplus/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Windows desktop and Genetics Lab
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: RustPlusDesktop/Features/GeneticsLab/package-lock.json
+      - name: Configure a public development build
+        shell: pwsh
+        run: Set-Content -LiteralPath .env -Value '# Public build; no cloud credentials configured.'
+      - name: Build Genetics Lab
+        working-directory: RustPlusDesktop/Features/GeneticsLab
+        run: |
+          npm ci
+          npm run build
+      - name: Test desktop code
+        run: dotnet test RustPlusDesktop.Tests/RustPlusDesktop.Tests.csproj -c Release -p:SkipGeneticsLabBuild=true -p:UseSharedCompilation=false --logger trx
+
+  alert-service:
+    name: Linux alert service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build the service
+        run: dotnet build BetterRustPlus.Server/BetterRustPlus.Server.csproj -c Release
+      - name: Check alert processing without Discord delivery
+        run: dotnet run --project BetterRustPlus.Server/Tests/BetterRustPlus.Alerts.Tests.csproj -c Release

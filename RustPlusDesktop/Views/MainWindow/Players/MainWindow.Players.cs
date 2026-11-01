@@ -898,7 +898,7 @@ public partial class MainWindow
             {
                 try 
                 {
-                    var dataPath = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RustPlusDesk", "WebView2_Report");
+                    var dataPath = System.IO.Path.Combine(RustPlusDesk.Services.AppDataPaths.LocalDirectory, "WebView2_Report");
                     var env = await Microsoft.Web.WebView2.Core.CoreWebView2Environment.CreateAsync(userDataFolder: dataPath);
                     if (!win.IsLoaded) return;
                     await wv.EnsureCoreWebView2Async(env);

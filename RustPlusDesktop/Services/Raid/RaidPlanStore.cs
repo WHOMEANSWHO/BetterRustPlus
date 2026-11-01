@@ -16,8 +16,7 @@ public sealed class RaidPlanStore
     public RaidPlanStore(string? path = null)
     {
         _path = path ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "RustPlusDesk", "raid-plan.json");
+            RustPlusDesk.Services.AppDataPaths.LocalDirectory, "raid-plan.json");
     }
 
     public async Task<IReadOnlyList<RaidPlanEntry>> LoadAsync(CancellationToken cancellationToken = default)

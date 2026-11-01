@@ -16,8 +16,7 @@ namespace RustPlusDesk.Services
     public static class CrashReporter
     {
         public static string CrashLogsDirectory { get; } = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk",
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory,
             "CrashLogs");
 
         private static readonly ConcurrentQueue<string> _recentLogs = new();
@@ -221,7 +220,7 @@ namespace RustPlusDesk.Services
             var paths = new System.Collections.Generic.List<string>();
             try
             {
-                var dir = Path.Combine(Path.GetTempPath(), "rpd-tickets");
+                var dir = Path.Combine(RustPlusDesk.Services.AppDataPaths.TempDirectory, "support");
                 Directory.CreateDirectory(dir);
 
                 // A point-in-time report: version, OS, memory, threads, and the recent log tail.

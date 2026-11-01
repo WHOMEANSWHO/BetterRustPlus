@@ -966,8 +966,7 @@ namespace RustPlusDesk.Views
             ImgMap.Visibility = Visibility.Collapsed;
 
             string webViewDataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "RustPlusDesk",
+                RustPlusDesk.Services.AppDataPaths.LocalDirectory,
                 "WebView2");
             Directory.CreateDirectory(webViewDataFolder);
             // The CoreWebView2 environment (fixed user-data folder) is identical across opens, so

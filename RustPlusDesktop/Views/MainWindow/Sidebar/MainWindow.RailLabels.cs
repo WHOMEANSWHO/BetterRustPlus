@@ -10,7 +10,7 @@ namespace RustPlusDesk.Views;
 
 /// <summary>
 /// Labelled rail: an optional wider rail that shows each tab's name beside its icon, for
-/// people who would rather read than learn the icons. Off by default; toggled from the rail
+/// people who would rather read than learn the icons. On by default; toggled from the rail
 /// and remembered. The width change is applied in one place (<see cref="ApplyRailLayout"/>)
 /// so the panel beside the rail and the overlays that start at its edge move with it.
 /// </summary>
@@ -86,7 +86,12 @@ public partial class MainWindow
             label.Text = fallback;
         label.SetBinding(TextBlock.ForegroundProperty, new Binding(nameof(Control.Foreground)) { Source = owner });
 
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        // Constrain the label so long translated names actually trim instead of overflowing.
+        // The button is RailEntryWidth - 4 wide with 18 pixels of horizontal padding.
+        var panel = new Grid { Width = Math.Max(0, RailEntryWidth - 22) };
+        panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        panel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(label, 1);
         panel.Children.Add(icon);
         panel.Children.Add(label);
         return panel;

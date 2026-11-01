@@ -64,12 +64,10 @@ namespace RustPlusDesk.Services
         public bool IsConfigured => File.Exists(ConfigPath) && new FileInfo(ConfigPath).Length > 50;
 
         internal static string ConfigPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk", "rustplusjs-config.json");
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
 
         private static string PersistentIdPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk", "fcm-persistent-ids.json");
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "fcm-persistent-ids.json");
 
         public Task StartAsync(CancellationToken ct = default) =>
             StartAsync(null, null, ct);

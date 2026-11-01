@@ -26,6 +26,10 @@ namespace RustPlusDesk.Views
         private string _activeSettingsCategory = "general";
         private bool _isShowingSearchResults;
         private bool _returnToCategoryPageAfterSearch;
+        private bool _reopenCategoryPage = true;
+        private double _reopenVerticalOffset;
+        private int _settingsNavigationGeneration;
+        private UIElement? _settingsFocusReturnTarget;
         private readonly List<(AdornerLayer Layer, Adorner Adorner)> _settingsHighlights = new();
         private int _settingsHighlightGeneration;
 
@@ -95,6 +99,7 @@ namespace RustPlusDesk.Views
             InitializeSettingsNavigation();
             Loaded += AppSettingsOverlay_Loaded;
             IsVisibleChanged += AppSettingsOverlay_IsVisibleChanged;
+            KeyDown += AppSettingsOverlay_KeyDown;
 
             Loaded += (_, __) => ApplyEventCapabilities();
             Services.EventCapabilities.Changed += OnEventCapabilitiesChanged;
@@ -131,8 +136,33 @@ namespace RustPlusDesk.Views
         {
             if (e.NewValue is true)
             {
+                if (!IsKeyboardFocusWithin)
+                {
+                    _settingsFocusReturnTarget = Keyboard.FocusedElement as UIElement;
+                }
+
+                if (_reopenCategoryPage)
+                {
+                    ShowSettingsCategoryList();
+                }
+                else
+                {
+                    ShowSettingsCategory(_activeSettingsCategory);
+                    var generation = _settingsNavigationGeneration;
+                    var offset = _reopenVerticalOffset;
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        // An explicit category/search navigation after opening takes precedence.
+                        if (IsVisible && generation == _settingsNavigationGeneration && !_isShowingSearchResults)
+                        {
+                            SettingsScrollViewer.ScrollToVerticalOffset(offset);
+                        }
+                    }), System.Windows.Threading.DispatcherPriority.Loaded);
+                }
+
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    if (!IsVisible) return;
                     SettingsSearchBox.Focus();
                     Keyboard.Focus(SettingsSearchBox);
                     SettingsSearchBox.SelectAll();
@@ -140,6 +170,11 @@ namespace RustPlusDesk.Views
                 return;
             }
 
+            _reopenCategoryPage = _isShowingSearchResults
+                ? _returnToCategoryPageAfterSearch
+                : SettingsCategoryPage.Visibility == Visibility.Visible;
+            _reopenVerticalOffset = SettingsScrollViewer.VerticalOffset;
+            var restoreFocus = Keyboard.FocusedElement is DependencyObject focused && IsAncestorOf(focused);
             _isShowingSearchResults = false;
             _returnToCategoryPageAfterSearch = false;
             if (DataContext is ViewModels.MainViewModel viewModel)
@@ -148,7 +183,27 @@ namespace RustPlusDesk.Views
             }
             SettingsSearchBox.Clear();
             ClearSettingsHighlights();
-            ShowSettingsCategoryList();
+            if (restoreFocus && _settingsFocusReturnTarget is { } returnTarget)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    // Do not take focus away from another panel opened while settings closed.
+                    var current = Keyboard.FocusedElement as DependencyObject;
+                    if (!IsVisible && returnTarget.IsVisible && returnTarget.IsEnabled &&
+                        (current == null || IsAncestorOf(current)))
+                    {
+                        returnTarget.Focus();
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Input);
+            }
+        }
+
+        private void AppSettingsOverlay_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Bubble after the focused control, allowing an open dropdown to consume Escape first.
+            if (e.Handled || e.Key != Key.Escape || Keyboard.Modifiers != ModifierKeys.None) return;
+            e.Handled = true;
+            BtnCloseSettings_Click(this, new RoutedEventArgs());
         }
 
         private static string T(string key, string fallback)
@@ -317,6 +372,7 @@ namespace RustPlusDesk.Views
 
         private void ShowSettingsCategoryList()
         {
+            _settingsNavigationGeneration++;
             SettingsCategoryPage.Visibility = Visibility.Visible;
             SettingsDetailPage.Visibility = Visibility.Collapsed;
             SettingsCategoryList.SelectedItem = null;
@@ -324,6 +380,7 @@ namespace RustPlusDesk.Views
 
         private void ShowSettingsCategory(string category, string? selectedSectionId = null)
         {
+            _settingsNavigationGeneration++;
             _activeSettingsCategory = category;
 
             // This page can be reached from the gear icon, the settings search and the tutorial,

@@ -71,7 +71,7 @@ namespace RustPlusDesk.Services.AiCompanion
         {
             get
             {
-                var path = Path.Combine(Path.GetTempPath(), "RustPlusDesk", "ai-companion");
+                var path = Path.Combine(RustPlusDesk.Services.AppDataPaths.TempDirectory, "ai-companion");
                 Directory.CreateDirectory(path);
                 return path;
             }

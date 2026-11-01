@@ -225,7 +225,7 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                 <Border Padding="10,9" Background="#FF15191E" BorderBrush="{DynamicResource CardBorder}" BorderThickness="0,0,0,1">
                     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <ui:Button Width="30" Height="30" Margin="0,0,10,0" Padding="0" Appearance="Transparent" ToolTip="{DynamicResource UiBackToSettingsCategories}" Click="SettingsBack_Click"><ui:SymbolIcon Symbol="ArrowLeft24" /></ui:Button>
+                        <ui:Button Width="30" Height="30" Margin="0,0,10,0" Padding="0" Appearance="Transparent" ToolTip="{DynamicResource UiBackToSettingsCategories}" AutomationProperties.Name="{DynamicResource UiBackToSettingsCategories}" Click="SettingsBack_Click"><ui:SymbolIcon Symbol="ArrowLeft24" /></ui:Button>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <ui:TextBlock x:Name="SettingsDetailTitle" FontSize="14" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" />
                             <ui:TextBlock x:Name="SettingsDetailSubtitle" Margin="0,2,0,0" FontSize="11" Foreground="{DynamicResource TextSubtle}" TextWrapping="Wrap" />

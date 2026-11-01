@@ -1520,8 +1520,7 @@ public partial class MainWindow : WpfUi.FluentWindow
 
     // Lokaler Icon-Cache (z.B. %LOCALAPPDATA%\RustPlusDesk\icons)
     private static readonly string sIconCacheDir =
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                               "RustPlusDesk", "icons");
+        System.IO.Path.Combine(RustPlusDesk.Services.AppDataPaths.LocalDirectory, "icons");
 
     // Bundled icon pack in the build/application folder (Assets/icons/items)
     private static readonly string sBundledIconDir =
@@ -1572,12 +1571,7 @@ public partial class MainWindow : WpfUi.FluentWindow
 
     private void UpdateAppTitle()
     {
-        bool signedIn = Services.Auth.SupabaseAuthManager.IsDiscordAuthenticated ||
-                        Services.Auth.SupabaseAuthManager.IsEmailAuthenticated;
-        string plan = signedIn
-            ? Services.Auth.SupabaseAuthManager.IsPremium ? " - Premium" : " - Free"
-            : string.Empty;
-        string title = $"RUST+ DESKTOP{plan} v{_updateService.VersionRaw}";
+        string title = $"BetterRustPlus v{_updateService.VersionRaw}";
 
         if (AppTitleBar != null)
             AppTitleBar.Title = title;
@@ -2011,8 +2005,7 @@ public partial class MainWindow : WpfUi.FluentWindow
     private static bool sNewDbLoaded = false;
     private static string sNewDbSource = "(unbekannt)";
     private static readonly string s_cacheDir = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "RustPlusDesk", "cache");
+        RustPlusDesk.Services.AppDataPaths.LocalDirectory, "cache");
     private static readonly string s_cachePath = System.IO.Path.Combine(s_cacheDir, "rust-item-list.json");
     private static readonly string s_metaPath = System.IO.Path.Combine(s_cacheDir, "rust-item-list.meta");
 
@@ -3927,6 +3920,8 @@ private sealed record MarkerRef(System.Windows.Shapes.Ellipse Dot, double U_DIP,
         try
         {
             if (link != null) link = link.Trim().Trim('"', '\'').Trim();
+            if (link?.StartsWith("betterrustplus://", StringComparison.OrdinalIgnoreCase) == true)
+                link = "rustplus://" + link["betterrustplus://".Length..];
 
             string host = "";
             int port = 28082; // Standard Rust+ Port
@@ -4692,8 +4687,7 @@ private sealed record MarkerRef(System.Windows.Shapes.Ellipse Dot, double U_DIP,
         _listenerStarting = false;
 
         var configPath = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk", "rustplusjs-config.json");
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
         try
         {
             if (File.Exists(configPath))
@@ -5352,7 +5346,7 @@ private sealed record MarkerRef(System.Windows.Shapes.Ellipse Dot, double U_DIP,
 
     private string GetOwnAvatarCachePath(string steamId64)
     {
-        var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RustPlusDesk", "avatars");
+        var dir = System.IO.Path.Combine(RustPlusDesk.Services.AppDataPaths.LocalDirectory, "avatars");
         if (!System.IO.Directory.Exists(dir))
         {
             System.IO.Directory.CreateDirectory(dir);
@@ -7475,8 +7469,7 @@ private sealed record MarkerRef(System.Windows.Shapes.Ellipse Dot, double U_DIP,
 
     private static string PairingConfigPath =>
     System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RustPlusDesk", "rustplusjs-config.json");
+        RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "rustplusjs-config.json");
 
     private async Task<bool> ResetPairingConfigAsync(bool stopListenerFirst = true)
     {
@@ -9170,12 +9163,10 @@ private sealed record MarkerRef(System.Windows.Shapes.Ellipse Dot, double U_DIP,
     private HotkeyOptions _hotkeyOptions = new();
 
     private static string HotkeyConfigPath =>
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                               "RustPlusDesk", "hotkeys.json");
+        System.IO.Path.Combine(RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "hotkeys.json");
 
     private static string HotkeyOptionsPath =>
-        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                               "RustPlusDesk", "hotkey_options.json");
+        System.IO.Path.Combine(RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "hotkey_options.json");
 
     private void LoadHotkeyOptions()
     {

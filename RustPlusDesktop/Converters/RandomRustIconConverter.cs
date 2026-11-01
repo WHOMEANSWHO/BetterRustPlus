@@ -28,8 +28,7 @@ namespace RustPlusDesk.Converters;
 public sealed class RandomRustIconConverter : IValueConverter
 {
     private static readonly string CacheDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "RustPlusDesk",
+        RustPlusDesk.Services.AppDataPaths.LocalDirectory,
         "icons");
 
     /// <summary>

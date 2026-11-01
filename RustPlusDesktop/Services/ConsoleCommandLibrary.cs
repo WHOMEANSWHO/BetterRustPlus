@@ -17,8 +17,7 @@ public static class ConsoleCommandLibrary
     private const string CatalogFileName = "console-commands.json";
 
     private static readonly string UserStatePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "RustPlusDesk", "console-helper.json");
+        RustPlusDesk.Services.AppDataPaths.LocalDirectory, "console-helper.json");
 
     private static List<ConsoleCommandDef>? _all;
     private static Action<string>? _log;

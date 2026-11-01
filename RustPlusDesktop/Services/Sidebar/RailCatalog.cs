@@ -62,14 +62,14 @@ public static class RailCatalog
 
     /// <summary>
     /// The shipped default layout: core tabs on top, all utilities collected into a
-    /// collapsed "Tools" folder.
+    /// expanded "Tools" folder so utilities are discoverable on first launch.
     /// </summary>
     public static RailLayoutData BuildDefault(string toolsFolderName)
     {
         var layout = new RailLayoutData { Version = CurrentDefaultVersion };
         foreach (var id in new[] { "devices", "team", "clan", "cameras", "players", "notifications" })
             layout.Nodes.Add(RailNodeData.Tab(id));
-        layout.Nodes.Add(RailNodeData.Folder(DefaultFolderId, toolsFolderName, DefaultFolderColor, DefaultFolderTabIds));
+        layout.Nodes.Add(RailNodeData.Folder(DefaultFolderId, toolsFolderName, DefaultFolderColor, DefaultFolderTabIds, expanded: true));
         return layout;
     }
 

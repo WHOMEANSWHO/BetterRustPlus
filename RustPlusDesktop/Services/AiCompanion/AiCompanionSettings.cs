@@ -192,8 +192,7 @@ namespace RustPlusDesk.Services.AiCompanion
     public static class AiCompanionStore
     {
         private static readonly string FilePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RustPlusDesk", "ai-companion.json");
+            RustPlusDesk.Services.AppDataPaths.RoamingDirectory, "ai-companion.json");
 
         // Tied to this entry so a file lifted onto another machine decrypts to nothing rather
         // than to somebody's key.

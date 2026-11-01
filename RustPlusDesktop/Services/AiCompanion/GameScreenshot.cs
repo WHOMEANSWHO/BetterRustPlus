@@ -74,7 +74,7 @@ namespace RustPlusDesk.Services.AiCompanion
                     using (var graphics = Graphics.FromImage(bitmap))
                         graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
 
-                    var folder = Path.Combine(Path.GetTempPath(), "RustPlusDesk", "ai-companion");
+                    var folder = Path.Combine(RustPlusDesk.Services.AppDataPaths.TempDirectory, "ai-companion");
                     Directory.CreateDirectory(folder);
 
                     var path = Path.Combine(folder, $"shot-{DateTime.UtcNow:yyyyMMdd-HHmmss}.jpg");
@@ -158,7 +158,7 @@ namespace RustPlusDesk.Services.AiCompanion
                     using (var graphics = Graphics.FromImage(bitmap))
                         graphics.CopyFromScreen(x, y, 0, 0, new Size(w, h), CopyPixelOperation.SourceCopy);
 
-                    var folder = Path.Combine(Path.GetTempPath(), "RustPlusDesk", "deaths");
+                    var folder = Path.Combine(RustPlusDesk.Services.AppDataPaths.TempDirectory, "deaths");
                     Directory.CreateDirectory(folder);
 
                     // One name, overwritten each time: this is scratch for the recogniser and

@@ -1,3 +1,15 @@
+# BetterRustPlus
+
+An unofficial Rust+ desktop companion by WHOMEANSWHO, forked from [Pronwan/rustplus-desktop](https://github.com/Pronwan/rustplus-desktop). The goal is to preserve the original features while making menus clearer and easier to navigate.
+
+**Development status:** initial fork setup. There is no BetterRustPlus installer release yet. Public-source compilation is currently blocked by missing private authentication classes; 3D maps also require the separately licensed MapParser. See [the development brief](docs/BETTERRUSTPLUS.md) for the navigation proposal, dependency findings and release work remaining.
+
+New default layouts show navigation labels and expanded Tools. Existing saved preferences are respected. App update checks target this fork's releases.
+
+The upstream documentation, attribution and license follow below.
+
+---
+
 ![Headline](RustPlusDesktop/Assets/Images/headlineGIT.jpg)  
 [![Discord](https://img.shields.io/badge/Discord-Rust²%20|%20Rust%2B%20Desktop-5865f2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/v4X584wye4)
 [![Cloud](https://github.com/Pronwan/rustplus-desktop/blob/master/cloud.png?raw=true)](https://rustplusdesktop.cloud)
