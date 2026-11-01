@@ -65,12 +65,18 @@ public sealed class AlertEngine(AlertOptions options, IAlertSender sender, TimeP
 
     public static string? ValidateConfiguration(AlertOptions options)
     {
+        if (options.AllowedServerIds is null || options.Rules is null || options.Targets is null)
+            return "Servers, rules and targets must be configured as collections, not null.";
+        if (options.Targets.Any(pair => string.IsNullOrWhiteSpace(pair.Key) || pair.Value is null))
+            return "Delivery targets require a name and configuration.";
         if (options.AllowedServerIds.Length > 128 || options.Rules.Count > 32 || options.Targets.Count > 32)
             return "Configuration supports at most 128 servers, 32 rules and 32 targets.";
         if (options.AllowedServerIds.Any(id => id is null || !ServerPattern.IsMatch(id))) return "Invalid configured server ID.";
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var rule in options.Rules)
         {
+            if (rule is null || rule.Kinds is null || rule.ServerIds is null || string.IsNullOrWhiteSpace(rule.Target))
+                return "Each rule requires event kinds, server filters and a delivery target.";
             if (string.IsNullOrWhiteSpace(rule.Id) || rule.Id.Length > 80 || !ids.Add(rule.Id)) return "Rule IDs must be unique and nonempty.";
             if (rule.CooldownSeconds is < 0 or > 86400) return "Cooldown must be between 0 and 86400 seconds.";
             if (rule.Kinds.Length == 0 || rule.Kinds.Any(kind => !SupportedKinds.Contains(kind))) return "Rule has unsupported event kinds.";

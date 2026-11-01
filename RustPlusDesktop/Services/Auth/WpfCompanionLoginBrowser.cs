@@ -20,6 +20,9 @@ internal sealed class WpfCompanionLoginBrowser : ICompanionLoginBrowser
             return await (await dispatcher.InvokeAsync(() => AuthenticateAsync(requestUri, callbackUri, cancellationToken))).ConfigureAwait(false);
 
         Uri? result = null;
+        bool closed = false;
+        Exception? initializationError = null;
+        Task initialization = Task.CompletedTask;
         var browser = new WebView2();
         var window = new Window
         {
@@ -28,31 +31,54 @@ internal sealed class WpfCompanionLoginBrowser : ICompanionLoginBrowser
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = browser, Owner = Application.Current.MainWindow
         };
-        using var cancel = cancellationToken.Register(() => dispatcher.BeginInvoke(new Action(() => window.Close())));
+        window.Closed += (_, _) => closed = true;
+        async Task InitializeAsync()
+        {
+            try
+            {
+                var profilePath = Path.Combine(AppDataPaths.LocalDirectory, "CompanionLoginWebView2");
+                var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profilePath);
+                if (closed || cancellationToken.IsCancellationRequested) return;
+                await browser.EnsureCoreWebView2Async(environment);
+                if (closed || cancellationToken.IsCancellationRequested) return;
+                browser.CoreWebView2.NavigationStarting += (_, e) =>
+                {
+                    if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) || !MatchesCallback(uri, callbackUri)) return;
+                    e.Cancel = true;
+                    result = uri;
+                    window.Close();
+                };
+                browser.CoreWebView2.Navigate(requestUri.AbsoluteUri);
+            }
+            catch (Exception ex)
+            {
+                initializationError = ex;
+                if (!closed) window.Close();
+            }
+        }
+        // Start initialization only once the modal window exists. Closing an unshown WPF
+        // window makes a later ShowDialog fail, and WebView2 needs a live visual host.
+        window.Loaded += (_, _) => initialization = InitializeAsync();
+        using var cancel = cancellationToken.Register(() =>
+        {
+            if (!dispatcher.HasShutdownStarted && !dispatcher.HasShutdownFinished)
+                dispatcher.BeginInvoke(new Action(() => { if (!closed) window.Close(); }));
+        });
         try
         {
-            var profilePath = Path.Combine(AppDataPaths.LocalDirectory, "CompanionLoginWebView2");
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profilePath);
             cancellationToken.ThrowIfCancellationRequested();
-            await browser.EnsureCoreWebView2Async(environment);
-            cancellationToken.ThrowIfCancellationRequested();
-            browser.CoreWebView2.NavigationStarting += (_, e) =>
-            {
-                if (!Uri.TryCreate(e.Uri, UriKind.Absolute, out var uri) || !MatchesCallback(uri, callbackUri)) return;
-                e.Cancel = true;
-                result = uri;
-                window.Close();
-            };
-            browser.CoreWebView2.Navigate(requestUri.AbsoluteUri);
             window.ShowDialog();
+            await initialization;
             cancellationToken.ThrowIfCancellationRequested();
+            if (initializationError is not null)
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(initializationError).Throw();
             return result;
         }
-        finally { browser.Dispose(); }
+        finally { if (!closed) window.Close(); browser.Dispose(); }
     }
 
     internal static bool MatchesCallback(Uri actual, Uri expected) =>
-        actual.IsAbsoluteUri && actual.Scheme == expected.Scheme &&
+        actual.IsAbsoluteUri && expected.IsAbsoluteUri && actual.Scheme == expected.Scheme &&
         actual.Host == expected.Host && actual.Port == expected.Port &&
         actual.AbsolutePath == expected.AbsolutePath && string.IsNullOrEmpty(actual.UserInfo);
 }

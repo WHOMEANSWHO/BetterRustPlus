@@ -6,7 +6,13 @@ Owner: WHOMEANSWHO. Repository: https://github.com/WHOMEANSWHO/BetterRustPlus. I
 
 ### Development progress — 1 November 2026
 
-The desktop opens with an isolated test profile. The integrated desktop suite passed 190 tests with one skipped before the latest pairing changes. The public companion-account library passed 22 offline tests. The WPF pairing flow now uses this library; six adapter tests pass, but real Steam/Rust+ pairing and companion relay have not been verified.
+The desktop opens with an isolated test profile. After fixing STA dispatcher teardown, the final integrated desktop suite passed 192 tests with one existing skip. The public companion-account library passed 22 offline tests. The WPF pairing flow now uses this library; eight focused adapter/browser tests pass, but real Steam/Rust+ pairing and companion relay have not been verified. Login initialization now respects window closure/cancellation, incomplete pairing files are preserved for recovery, and repair distinguishes invalid pairing from unavailable services.
+
+Alert processing passed 28 checks and the local service passed 12 HTTP checks, without Discord delivery. Malformed null configuration collections now produce validation errors instead of crashes.
+
+Genetics Lab builds after updating Vite to 6.4.5 and Vitest to 4.1.12; the refreshed npm dependency audit reports zero vulnerabilities. Its tests report 434 passed, 16 skipped and 12 failures caused by missing capture fixtures in the public checkout. Those missing files must be restored before this suite can pass; the failures have not been hidden or replaced with fabricated captures.
+
+ImageSharp remains at 3.1.12 with known advisories. The patched 3.2.0 release requires a valid license key for direct references, so an unconfigured upgrade would break public builds. Resolve a compatible key or replace this dependency before release. Live login, Discord delivery, event detection and the missing private map parser remain separate release requirements.
 
 The Windows desktop compiles with public companion adapters. Genetics Lab builds separately. Initial navigation improvements preserve settings location and add keyboard/focus support. BetterRustPlus uses separate data folders and a separate protocol, with an isolated workspace profile available for testing.
 
@@ -127,7 +133,7 @@ Keep the selected server and connection status visible. Use labelled navigation 
 - Cloud, community, sync, Discord bot and smart-home features rely on upstream services and configuration. Forking client code does not establish independent backend infrastructure or provide access credentials.
 - The upstream release workflow checks out the private MapParser unconditionally. Copying that workflow will not reproduce the maintainer's installer without access.
 - A workspace-local .NET 8 SDK and npm were installed and dependencies restored. The original public build failed on missing authentication classes; compatibility adapters now allow compilation while clearly reporting unsupported authentication and repair. Genetics Lab builds separately.
-- Restore also reported existing ImageSharp 3.1.12 dependency advisories. Dependency updates need review before release.
+- Restore reports existing ImageSharp 3.1.12 dependency advisories. The patched 3.2.0 direct reference requires a valid license key; this remains unresolved before release. Frontend dependency advisories have been resolved in the current lockfile.
 
 ## GitHub and release work remaining
 

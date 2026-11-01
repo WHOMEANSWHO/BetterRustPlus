@@ -160,14 +160,16 @@ public static class FcmRepairService
             var account = await PublicCompanion.Locked(s => s.RenewPushAsync(PublicCompanion.ConfigPath, ct), ct).ConfigureAwait(false);
             return account.State == AccountState.Active
                 ? new(RepairOutcome.Repaired, "Push registration renewed.")
-                : new(RepairOutcome.Unavailable, "Push renewal was not confirmed.");
+                : new(account.State is AccountState.Expired or AccountState.Rejected or AccountState.Missing or AccountState.Invalid
+                    ? RepairOutcome.NeedsFullRePair : RepairOutcome.Unavailable, "Push renewal was not confirmed.");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (CompanionAccountException ex)
         {
             string message = PublicCompanion.SafeMessage(ex.Failure);
             log("[fcm-repair] " + message);
-            return new(ex.Failure == AccountFailure.Rejected ? RepairOutcome.NeedsFullRePair : RepairOutcome.Unavailable, message);
+            return new(ex.Failure is AccountFailure.Rejected or AccountFailure.InvalidConfiguration
+                ? RepairOutcome.NeedsFullRePair : RepairOutcome.Unavailable, message);
         }
         catch (Exception) { log("[fcm-repair] Push renewal is unavailable."); return new(RepairOutcome.Unavailable, "Push renewal is unavailable."); }
     }

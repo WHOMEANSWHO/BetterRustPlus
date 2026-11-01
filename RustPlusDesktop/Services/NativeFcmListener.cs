@@ -95,7 +95,7 @@ namespace RustPlusDesk.Services
             _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
 
-            if (!IsConfigured)
+            if (!File.Exists(ConfigPath))
             {
                 _log("[fcm-native] No FCM config found — running native registration first …");
                 bool ok = await NativeFcmRegistrationService.TryRegisterAsync(
@@ -113,8 +113,8 @@ namespace RustPlusDesk.Services
                 // The public registration service writes its own metadata atomically. Treat its
                 // 15-day expiry as an estimate and never overwrite the validated Steam identity.
                 var (issuedAt, expiresAt) = NativeFcmRegistrationService.ReadRegistrationMetadata(ConfigPath);
-                if (issuedAt.HasValue) TrackingService.FcmIssuedAt = issuedAt.Value;
-                if (expiresAt.HasValue) TrackingService.FcmExpiresAt = expiresAt.Value;
+                TrackingService.FcmIssuedAt = issuedAt;
+                TrackingService.FcmExpiresAt = expiresAt;
 #else
                 var issuedAt = DateTime.Now;
                 var expiresAt = issuedAt.AddDays(15);

@@ -187,6 +187,9 @@ public sealed class FacepunchFeatureRemovalTests
                     window.Close();
                 }
                 app?.Shutdown();
+                // Dispose dispatcher-owned HWNDs before the STA exits so native
+                // WPF callbacks cannot outlive their managed owner thread.
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown();
             }
         });
         thread.SetApartmentState(ApartmentState.STA);

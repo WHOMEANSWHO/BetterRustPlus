@@ -16,6 +16,10 @@ int checks = 0;
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }
 
 Check(AlertEngine.ValidateConfiguration(options) is null, "Valid configuration rejected.");
+Check(AlertEngine.ValidateConfiguration(new AlertOptions { Rules = null! }) is not null, "Null rules should be rejected cleanly.");
+Check(AlertEngine.ValidateConfiguration(new AlertOptions { Rules = [null!] }) is not null, "Null rule should be rejected cleanly.");
+Check(AlertEngine.ValidateConfiguration(new AlertOptions { Rules = [new AlertRule { Kinds = null! }] }) is not null, "Null event kinds should be rejected cleanly.");
+Check(AlertEngine.ValidateConfiguration(new AlertOptions { Targets = new() { ["primary"] = null! } }) is not null, "Null target should be rejected cleanly.");
 Check((await engine.ProcessAsync(Event() with { ServerId = "unknown" })).Status == "rejected", "Unknown server accepted.");
 Check((await engine.ProcessAsync(Event() with { OccurredAt = now.AddMinutes(-6) })).Status == "rejected", "Stale event accepted.");
 Check((await engine.ProcessAsync(Event() with { OccurredAt = now.AddMinutes(1) })).Status == "rejected", "Future event accepted.");

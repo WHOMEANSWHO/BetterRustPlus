@@ -82,7 +82,11 @@ public sealed class PublicAuthCompatibilityTests
     {
         fake.State = AccountState.Expired;
         Assert.AreEqual(RustPlusTokenStatus.Expired, (await RustCompanionAuthService.CheckTokenStatusAsync()).Status);
+        Assert.AreEqual(FcmRepairService.RepairOutcome.NeedsFullRePair, (await FcmRepairService.TryRepairAsync(_ => { })).Outcome);
+        fake.State = AccountState.Offline;
         Assert.AreEqual(FcmRepairService.RepairOutcome.Unavailable, (await FcmRepairService.TryRepairAsync(_ => { })).Outcome);
+        fake.Failure = new CompanionAccountException(AccountFailure.InvalidConfiguration);
+        Assert.AreEqual(FcmRepairService.RepairOutcome.NeedsFullRePair, (await FcmRepairService.TryRepairAsync(_ => { })).Outcome);
         fake.Failure = new CompanionAccountException(AccountFailure.Rejected);
         Assert.AreEqual(FcmRepairService.RepairOutcome.NeedsFullRePair, (await FcmRepairService.TryRepairAsync(_ => { })).Outcome);
     }
