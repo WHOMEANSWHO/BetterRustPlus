@@ -6,6 +6,8 @@ An unofficial Rust+ desktop companion by WHOMEANSWHO, forked from [Pronwan/rustp
 
 New default layouts show navigation labels and expanded Tools. Existing saved preferences are respected. App update checks target this fork's releases.
 
+The [full feature checklist](docs/BETTERRUSTPLUS-FEATURES.md) includes the supplied reference table and the group's additional requests, with implementation status. [VPS setup](BetterRustPlus.Server/README.md) covers the optional paired-server source, protected team snapshots, Discord delivery and group bot. Hosting is prepared for later; no VPS or live accounts have been configured.
+
 The upstream documentation, attribution and license follow below.
 
 ---

@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Using Include="System.IO" />
+    <Content Include="Fixtures\Camera\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

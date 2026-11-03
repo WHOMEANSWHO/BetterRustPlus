@@ -1,6 +1,31 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { RasterImage } from '../services/scanner/scannerTypes.ts';
 import { plantFromTitle, plantNameRect, readPlantName, searchPlantTitle } from '../services/scanner/plantNameReader.ts';
+
+// These ten captures are referenced by upstream tests but were never published. Only
+// this explicit inventory may be optional; losing any published fixture still fails.
+const OPTIONAL_CAPTURES = [
+  'plant-planter-hemp-ui10-12', 'plant-planter-orchid-ui10-13',
+  'plant-planter-wheat-ui10-14', 'plant-planter-green-berry-ui10-15',
+  'plant-planter-blue-berry-ui10-16', 'plant-planter-rose-ui07-22',
+  'plant-planter-hemp-ui07-23', 'plant-planter-red-berry-ui07-24',
+  'plant-planter-red-berry-ui07-25', 'plant-planter-sunflower-ui07-26'
+];
+const fsModule = 'node:fs';
+const processModule = 'node:process';
+const { existsSync } = await import(fsModule);
+const { env, stderr } = await import(processModule);
+const missingCaptures = OPTIONAL_CAPTURES.filter(name =>
+  !existsSync(new URL(`./fixtures/${name}.rgba.gz`, import.meta.url)));
+if (missingCaptures.length > 0) {
+  const message = `Unpublished optional capture fixtures (${missingCaptures.length}): ${missingCaptures.join(', ')}. See src/tests/fixtures/README.md.`;
+  if (env.BETTERRUSTPLUS_REQUIRE_CAPTURE_FIXTURES === '1') throw new Error(message);
+  beforeAll(() => { stderr.write(`${message}\n`); });
+}
+function captureTest(title: string, names: readonly string[], run: () => Promise<void>) {
+  const missing = names.filter(name => missingCaptures.includes(name));
+  it.skipIf(missing.length > 0)(missing.length ? `${title} [unpublished capture unavailable]` : title, run);
+}
 
 async function loadFixture(name: string, width: number, height: number): Promise<RasterImage> {
   const fsName = 'node:fs';
@@ -74,14 +99,16 @@ const CAPTURES = [
 
 describe('readPlantName on captures', () => {
   for (const capture of CAPTURES) {
-    it(`reads ${capture.plant} from ${capture.name} (pitch ${capture.row.pitch})`, async () => {
+    captureTest(`reads ${capture.plant} from ${capture.name} (pitch ${capture.row.pitch})`, [capture.name], async () => {
       const image = await loadFixture(capture.name, capture.width, capture.height);
       const read = readPlantName(image, capture.row, capture.type);
       expect(read?.plant, read?.text).toBe(capture.plant);
     });
   }
 
-  it('tells R from P (the leg), even at UI scale 0.7', async () => {
+  captureTest('tells R from P (the leg), even at UI scale 0.7', [
+    'plant-planter-green-berry-ui10-15', 'plant-planter-sunflower-ui07-26', 'plant-planter-red-berry-ui07-24'
+  ], async () => {
     for (const [name, width, height, row, expected] of [
       ['plant-planter-green-berry-ui10-15', 480, 185, { x: 99, y: 142, pitch: 61.6 }, 'GREEN BERRY'],
       ['plant-planter-sunflower-ui07-26', 337, 130, { x: 70, y: 100, pitch: 43.2 }, 'SUNFLOWER'],
@@ -120,6 +147,9 @@ describe('readPlantName on captures', () => {
     // The title starting further left than the band.
     expect(searchPlantTitle(inventory, { ...row, x: row.x + 1.5 * row.pitch }, 'inventory').read.plant).toBe('green-berry');
 
+  });
+
+  captureTest('finds an offset planter title at UI scale 0.7', ['plant-planter-hemp-ui07-23'], async () => {
     const planter = await loadFixture('plant-planter-hemp-ui07-23', 337, 130);
     for (const dy of [-0.5, 0.5]) {
       expect(searchPlantTitle(planter, { x: 70, y: 100 + dy * 43.2, pitch: 43.2 }, 'planter').read.plant).toBe('hemp');

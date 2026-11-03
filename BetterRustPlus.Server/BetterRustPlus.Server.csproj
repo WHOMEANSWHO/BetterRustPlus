@@ -7,7 +7,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="RustSourceWorker.cs" />
+    <Compile Include="DiscordBotWorker.cs" />
+    <PackageReference Include="Discord.Net.WebSocket" Version="3.20.2" />
+    <PackageReference Include="RustPlusApi" Version="2.0.0-beta.9.socket.1" />
     <ProjectReference Include="Core/BetterRustPlus.Alerts.csproj" />
-    <Content Remove="Tests/**;Core/**" />
+    <Content Remove="Tests/**;Bot.Tests/**;Core/**" />
   </ItemGroup>
 </Project>

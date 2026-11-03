@@ -1,0 +1,30 @@
+name: betterrustplus
+services:
+  alerts:
+    build:
+      context: ../..
+      dockerfile: BetterRustPlus.Server/Dockerfile
+    image: betterrustplus-alerts:local
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:5088
+    # Accessible only on the VPS itself. Use an SSH tunnel or a secured private
+    # network/reverse proxy for approved remote producers; do not bind public HTTP.
+    ports:
+      - "127.0.0.1:5088:5088"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"

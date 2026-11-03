@@ -1,0 +1,20 @@
+# This Dockerfile uses the repository root as its build context. Only public
+# service source and its checked-in NuGet feed are sent to Docker.
+**
+!nuget.config
+!packages-local/
+!packages-local/*.nupkg
+!BetterRustPlus.Server/
+!BetterRustPlus.Server/**
+BetterRustPlus.Server/**/bin
+BetterRustPlus.Server/**/obj
+BetterRustPlus.Server/Tests
+BetterRustPlus.Server/Bot.Tests
+BetterRustPlus.Server/deploy
+BetterRustPlus.Server/README.md
+**/.env
+**/.env.*
+**/*.env
+**/*.key
+**/*.pfx
+**/*.pem

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -8,9 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
 
 namespace RustPlusDesk.Services.Emoji;
 
@@ -44,7 +43,7 @@ public static class EmojiService
 
     private static readonly Dictionary<string, EmojiEntry> s_customEmojisByName = new(StringComparer.OrdinalIgnoreCase);
     private static readonly List<EmojiEntry> s_customEmojiList = new();
-    private static readonly Dictionary<string, ImageSource> s_iconCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, ImageSource> s_iconCache = new(StringComparer.OrdinalIgnoreCase);
 
     private static readonly (string name, string displayName, string category)[] s_rawCustomEmojis =
     [
@@ -115,12 +114,12 @@ public static class EmojiService
         return Views.MainWindow.ResolveItemIcon(0, entry.Name, 32);
     }
 
-    private static readonly Dictionary<string, BitmapSource[]> s_animatedFramesCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, BitmapSource[]> s_animatedFramesCache = new(StringComparer.OrdinalIgnoreCase);
 
     // Per-frame display durations in milliseconds, parallel to s_animatedFramesCache. Playing the
     // frames back on a fixed clock ignores how the emoji was actually authored; these keep the
     // speed true to the source (the Rust emojis are 60fps, i.e. ~16ms a frame).
-    private static readonly Dictionary<string, int[]> s_frameDelaysCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, int[]> s_frameDelaysCache = new(StringComparer.OrdinalIgnoreCase);
 
     public static string? GetCustomEmojiWebpPath(string emojiName)
     {
@@ -164,58 +163,37 @@ public static class EmojiService
 
         try
         {
-            using var image = Image.Load<Rgba32>(webpPath);
-            int frameCount = image.Frames.Count;
-            if (frameCount == 0) return null;
-
+            using var stream = File.OpenRead(webpPath);
+            using var codec = SKCodec.Create(stream);
+            if (codec is null) return null;
+            int frameCount = Math.Max(1, codec.FrameCount);
+            int width = codec.Info.Width, height = codec.Info.Height;
+            if (!ImageDecodeLimits.IsSafeAnimation(width, height, frameCount)) return null;
+            var frameInfo = codec.FrameInfo;
             var list = new BitmapSource[frameCount];
             var delays = new int[frameCount];
+            var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Unpremul);
+            using var bitmap = new SKBitmap(info);
             for (int i = 0; i < frameCount; i++)
             {
-                var frame = image.Frames[i];
-
-                // Real per-frame delay from the WebP; fall back to 60fps when a frame omits it.
-                int delayMs = 16;
-                try
-                {
-                    var frameDelay = (int)frame.Metadata.GetWebpMetadata().FrameDelay;
-                    if (frameDelay > 0) delayMs = frameDelay;
-                }
-                catch { }
-                delays[i] = delayMs;
-
-                var bgraBytes = new byte[frame.Width * frame.Height * 4];
-                frame.CopyPixelDataTo(bgraBytes);
-
-                // Convert RGBA -> BGRA32 for WPF with zero alpha noise
+                // No prior frame: Skia reconstructs required frames and applies WebP blend/disposal.
+                // Each WPF snapshot is independent of later decodes.
+                bitmap.Erase(SKColors.Transparent);
+                if (codec.GetPixels(info, bitmap.GetPixels(), new SKCodecOptions(i, -1)) != SKCodecResult.Success)
+                    return null;
+                delays[i] = i < frameInfo.Length && frameInfo[i].Duration > 0 ? frameInfo[i].Duration : 16;
+                var bgraBytes = bitmap.Bytes;
                 for (int p = 0; p < bgraBytes.Length; p += 4)
                 {
-                    byte r = bgraBytes[p];
-                    byte g = bgraBytes[p + 1];
-                    byte b = bgraBytes[p + 2];
-                    byte a = bgraBytes[p + 3];
-
-                    if (a <= 8)
-                    {
-                        bgraBytes[p] = 0;
-                        bgraBytes[p + 1] = 0;
-                        bgraBytes[p + 2] = 0;
-                        bgraBytes[p + 3] = 0;
-                    }
-                    else
-                    {
-                        bgraBytes[p] = b;     // Blue
-                        bgraBytes[p + 2] = r; // Red
-                    }
+                    if (bgraBytes[p + 3] <= 8)
+                        bgraBytes.AsSpan(p, 4).Clear();
                 }
-
-                var bmp = BitmapSource.Create(frame.Width, frame.Height, 96, 96, PixelFormats.Bgra32, null, bgraBytes, frame.Width * 4);
+                var bmp = BitmapSource.Create(width, height, 96, 96, PixelFormats.Bgra32, null, bgraBytes, bitmap.RowBytes);
                 bmp.Freeze();
                 list[i] = bmp;
             }
-
-            s_animatedFramesCache[emojiName] = list;
             s_frameDelaysCache[emojiName] = delays;
+            s_animatedFramesCache[emojiName] = list;
             return list;
         }
         catch (Exception ex)

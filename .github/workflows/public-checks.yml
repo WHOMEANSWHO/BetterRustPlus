@@ -30,6 +30,7 @@ jobs:
         working-directory: RustPlusDesktop/Features/GeneticsLab
         run: |
           npm ci
+          npm test
           npm run build
       - name: Test desktop code
         run: dotnet test RustPlusDesktop.Tests/RustPlusDesktop.Tests.csproj -c Release -p:SkipGeneticsLabBuild=true -p:UseSharedCompilation=false --logger trx
@@ -48,3 +49,46 @@ jobs:
         run: dotnet build BetterRustPlus.Server/BetterRustPlus.Server.csproj -c Release
       - name: Check alert processing without Discord delivery
         run: dotnet run --project BetterRustPlus.Server/Tests/BetterRustPlus.Alerts.Tests.csproj -c Release
+      - name: Check Discord bot policy without connecting
+        run: dotnet run --project BetterRustPlus.Server/Bot.Tests/BetterRustPlus.Bot.Tests.csproj -c Release
+      - name: Build VPS container
+        run: docker build -f BetterRustPlus.Server/Dockerfile -t betterrustplus-alerts:ci .
+      - name: Check container locally without game or Discord connections
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BETTERRUSTPLUS_INGEST_KEY="$(openssl rand -hex 32)"
+          echo "::add-mask::$BETTERRUSTPLUS_INGEST_KEY"
+          trap 'docker logs betterrustplus-ci; docker rm -f betterrustplus-ci' EXIT
+          docker run -d --name betterrustplus-ci --read-only --tmpfs /tmp:rw,noexec,nosuid,size=32m \
+            --cap-drop ALL --security-opt no-new-privileges:true \
+            -p 127.0.0.1:5088:5088 --env BETTERRUSTPLUS_INGEST_KEY \
+            -e Alerts__DryRun=true -e RustSource__Enabled=false -e DiscordBot__Enabled=false \
+            -e Alerts__AllowedServerIds__0=ci-server \
+            -e Alerts__Rules__0__Id=ci-cargo -e Alerts__Rules__0__Kinds__0=cargo \
+            betterrustplus-alerts:ci
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 3 \
+            http://127.0.0.1:5088/health > /dev/null
+          test "$(docker exec betterrustplus-ci id -u)" -ne 0
+          python3 - <<'PY'
+          import datetime, json, os, urllib.request, uuid
+          base = 'http://127.0.0.1:5088'
+          with urllib.request.urlopen(base + '/health', timeout=5) as response:
+              health = json.load(response)
+          assert health['status'] == 'running'
+          assert health['mode'] == 'dry-run'
+          assert health['ingestionConfigured'] is True
+          assert health['gameSourceConnected'] is False
+          observation = dict(id=str(uuid.uuid4()), serverId='ci-server', kind='cargo',
+                             occurredAt=datetime.datetime.now(datetime.timezone.utc).isoformat(), evidence='confirmed')
+          def send():
+              request = urllib.request.Request(base + '/events', data=json.dumps(observation).encode(),
+                  headers={'Content-Type': 'application/json',
+                           'Authorization': 'Bearer ' + os.environ['BETTERRUSTPLUS_INGEST_KEY']})
+              with urllib.request.urlopen(request, timeout=5) as response:
+                  return json.load(response)
+          first = send()
+          assert first['simulated'] == 1 and first['delivered'] == 0, first
+          assert send()['duplicate'] == 1
+          print('Container liveness, non-root execution, dry-run ingestion and duplicate checks passed.')
+          PY

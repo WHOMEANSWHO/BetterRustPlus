@@ -80,7 +80,45 @@ Check(expiredDuringDelivery.Status == "expired" && expiredDuringDelivery.Deliver
     "A slow earlier delivery allowed a new target to receive a stale event.");
 options.Rules.Add(new AlertRule { Id = "raid", Kinds = ["raid"] });
 Check(AlertEngine.ValidateConfiguration(options) is not null, "Duplicate rule IDs accepted.");
-Console.WriteLine($"Passed {checks} alert-pipeline checks. No Discord requests were made.");
+var observations = new ObservationTracker("group-server");
+var living = new TeamObservation(1, "Nathan", true, true, 700, 2300, now.AddHours(-1).UtcDateTime);
+Check(observations.ObserveTeam([living], 3000, now).Count == 0, "Startup team snapshot generated a historical death.");
+Check(observations.ObserveTeam([living with { IsOnline = false }], 3000, now).Count == 0, "Going offline generated a death.");
+observations.ObserveTeam([living], 3000, now);
+var dead = living with { IsAlive = false, X = 0, Y = 0, LastDeathTime = now.UtcDateTime };
+var detectedDeath = observations.ObserveTeam([dead], 3000, now).Single();
+Check(detectedDeath.Grid == "E4" && detectedDeath.PositionIsLastKnown && detectedDeath.PlayerName == "Nathan",
+    "Death must carry explicitly last-seen grid, not unverified dead-player coordinates.");
+Check(observations.ObserveTeam([dead], 3000, now).Count == 0, "Repeated dead snapshot duplicated an alert.");
+Check(observations.ObserveTeam([dead with { LastDeathTime = now.AddSeconds(1).UtcDateTime }], 3000, now.AddSeconds(2)).Count == 0,
+    "Delayed death timestamp duplicated an already-announced death.");
+Check(observations.ObserveTeam([living with { LastDeathTime = now.AddSeconds(10).UtcDateTime }], 3000, now.AddSeconds(15)).Count == 1,
+    "Death plus respawn between polls was missed.");
+Check(observations.ObserveTeam([], 3000, now).Count == 0, "Team departure generated a death.");
+Check(new ObservationTracker("new").ObserveTeam([dead], 3000, now).Count == 0, "Reconnection replayed old deaths.");
+var delayedTracker = new ObservationTracker("group-server");
+delayedTracker.ObserveTeam([living], 3000, now);
+Check(delayedTracker.ObserveTeam([living with { IsAlive = false }], 3000, now.AddSeconds(1)).Count == 1,
+    "Alive-to-dead transition with delayed death timestamp was missed.");
+Check(delayedTracker.ObserveTeam([living with { LastDeathTime = now.UtcDateTime }], 3000, now.AddSeconds(2)).Count == 0,
+    "Respawn with a delayed timestamp re-announced the previous inferred death.");
+Check(ObservationTracker.MapGrid(0, 3000, 3000) == "A0" && ObservationTracker.MapGrid(3000, 0, 3000) == "T19",
+    "Map edges use wrong grid origin or indexing.");
+Check(ObservationTracker.MapGrid(4250d / 29 * 4 + 1, 4250d / 29 * 5 - 1, 4250) == "E24",
+    "Non-150-divisible maps drift between grid boundaries.");
+Check(ObservationTracker.MapGrid(-1, 0, 3000) is null && ObservationTracker.MapGrid(double.NaN, 10, 3000) is null &&
+    ObservationTracker.MapGrid(5, 5, 0) is null, "Invalid/off-map coordinates produced a misleading grid.");
+Check(observations.ObserveCargo([new CargoObservation(1, 500, 500)], 3000, now).Count == 0,
+    "Already-present cargo was announced as a new arrival at startup.");
+Check(observations.ObserveCargo([new CargoObservation(1, 500, 500), new CargoObservation(2, 700, 2300)], 3000, now).Single().Grid == "E4",
+    "New cargo marker did not generate a located observation.");
+Check(observations.ObserveCargo([new CargoObservation(2, 800, 2200)], 3000, now).Count == 0, "Cargo movement generated a duplicate arrival.");
+Check(observations.ObserveAlarm(42, true, now) is null && observations.ObserveAlarm(42, true, now) is null,
+    "Startup active alarm generated a historical raid.");
+observations.ObserveAlarm(42, false, now);
+Check(observations.ObserveAlarm(42, true, now)?.Kind == "raid", "Alarm rising edge was missed.");
+WorkerChecks.Run(Check);
+Console.WriteLine($"Passed {checks} alert/source checks. No Discord requests were made.");
 
 sealed class TestClock(DateTimeOffset now) : TimeProvider
 {

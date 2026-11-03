@@ -4,21 +4,21 @@ Owner: WHOMEANSWHO. Repository: https://github.com/WHOMEANSWHO/BetterRustPlus. I
 
 ## Product direction
 
-### Development progress — 1 November 2026
+### Development progress — 3 November 2026
 
-The desktop opens with an isolated test profile. After fixing STA dispatcher teardown, the final integrated desktop suite passed 192 tests with one existing skip. The public companion-account library passed 22 offline tests. The WPF pairing flow now uses this library; eight focused adapter/browser tests pass, but real Steam/Rust+ pairing and companion relay have not been verified. Login initialization now respects window closure/cancellation, incomplete pairing files are preserved for recovery, and repair distinguishes invalid pairing from unavailable services.
+The desktop opens with an isolated test profile. The integrated desktop suite passed 204 tests with one existing skip after the image and camera changes. The public companion-account library passed 22 offline tests. Eight focused adapter/browser tests pass, but real Steam/Rust+ pairing and companion relay have not been verified. Login initialization respects window closure/cancellation, incomplete pairing files are preserved for recovery, and repair distinguishes invalid pairing from unavailable services.
 
-Alert processing passed 28 checks and the local service passed 12 HTTP checks, without Discord delivery. Malformed null configuration collections now produce validation errors instead of crashes.
+The listener includes an optional paired Rust+ source, protected team snapshots and event rules. Offline checks passed 75 alert/source cases, 45 bot-policy/delivery cases and 15 local HTTP cases, without game or Discord connections. Malformed null configuration collections produce validation errors instead of crashes. Team deaths distinguish last-seen grids from exact death locations, and source health distinguishes disabled, degraded, stale and disconnected states. Alarm processing runs independently of slow polling, with bounded retry scheduling that preserves event IDs.
 
-Genetics Lab builds after updating Vite to 6.4.5 and Vitest to 4.1.12; the refreshed npm dependency audit reports zero vulnerabilities. Its tests report 434 passed, 16 skipped and 12 failures caused by missing capture fixtures in the public checkout. Those missing files must be restored before this suite can pass; the failures have not been hidden or replaced with fabricated captures.
+Genetics Lab builds with Vite 6.4.5 and Vitest 4.1.12; npm audit reports zero vulnerabilities. Its public suite passed 441 tests with 28 skips: 16 existing skips and 12 explicitly reported cases requiring ten unpublished captures. All 17 published capture files remain mandatory. A strict capture mode fails if the unpublished files are absent. Generated geometry tests supplement the available real captures without claiming to reproduce the missing game captures.
 
-ImageSharp remains at 3.1.12 with known advisories. The patched 3.2.0 release requires a valid license key for direct references, so an unconfigured upgrade would break public builds. Resolve a compatible key or replace this dependency before release. Live login, Discord delivery, event detection and the missing private map parser remain separate release requirements.
+ImageSharp has been removed completely, including the camera package's transitive reference. MIT-licensed SkiaSharp handles icons, animated WebP and camera PNG encoding. Public camera source is pinned with provenance/licenses; five real captured camera sequences pass pixel-exact golden checks. The full desktop dependency audit reports no known vulnerable packages from the configured sources. Live login, Discord delivery, source verification and replacement map parsing remain release requirements.
 
 The Windows desktop compiles with public companion adapters. Genetics Lab builds separately. Initial navigation improvements preserve settings location and add keyboard/focus support. BetterRustPlus uses separate data folders and a separate protocol, with an isolated workspace profile available for testing.
 
-A separate .NET 8 alert-service foundation accepts authenticated supplied events, supports dry-run rules for cargo, airdrops, Deep Sea, raids and teammate death grids, and can be configured for Discord webhooks. It is not connected to Rust+, not deployed, and does not yet detect game events or provide an interactive Discord bot. Delivery state is in memory and resets on restart. A busy sender returns a retryable response instead of indefinitely blocking other events.
+A separate .NET 8 service accepts authenticated supplied events and optionally connects to one paired Rust+ server. It observes available team/death state, new cargo markers and configured Smart Alarm changes; universal airdrop/Deep Sea detection is not implemented. An optional group Discord bot provides private status, alert-rule and team commands and can deliver alerts to approved channels; official webhooks are an alternative. Live integrations stay disabled until configured. Container/Compose setup is prepared for a future VPS, with CI container checks. Delivery state remains memory-only and resets on restart; this is not yet a production alert guarantee.
 
-The GitHub fork and development branch exist. No installer has been released. Live pairing verification, 3D maps and automatic event detection remain outstanding.
+The GitHub fork and development branch exist. No installer has been released. The [full feature checklist](BETTERRUSTPLUS-FEATURES.md) includes all 46 screenshot rows and the owner's additional requirements, with inherited, partial and missing behavior distinguished. Live acceptance, durable delivery, a group dashboard, complete command parity and 3D map data remain outstanding.
 
 Preserve the upstream feature set and improve how people find and configure it. Keep C#/.NET 8 and WPF for the Windows desktop application. Keep the embedded Genetics Lab frontend in its existing TypeScript stack. A language rewrite would put feature parity at risk without solving navigation.
 
@@ -133,7 +133,7 @@ Keep the selected server and connection status visible. Use labelled navigation 
 - Cloud, community, sync, Discord bot and smart-home features rely on upstream services and configuration. Forking client code does not establish independent backend infrastructure or provide access credentials.
 - The upstream release workflow checks out the private MapParser unconditionally. Copying that workflow will not reproduce the maintainer's installer without access.
 - A workspace-local .NET 8 SDK and npm were installed and dependencies restored. The original public build failed on missing authentication classes; compatibility adapters now allow compilation while clearly reporting unsupported authentication and repair. Genetics Lab builds separately.
-- Restore reports existing ImageSharp 3.1.12 dependency advisories. The patched 3.2.0 direct reference requires a valid license key; this remains unresolved before release. Frontend dependency advisories have been resolved in the current lockfile.
+- ImageSharp and its transitive camera dependency were replaced by SkiaSharp; the current desktop dependency audit and frontend audit report no known vulnerabilities from the configured sources.
 
 ## GitHub and release work remaining
 

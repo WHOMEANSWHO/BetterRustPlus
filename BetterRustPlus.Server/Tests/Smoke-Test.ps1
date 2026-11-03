@@ -28,6 +28,8 @@ foreach ($configured in @($false, $true)) {
     $start.Environment.Remove('BETTERRUSTPLUS_INGEST_KEY') | Out-Null
     if ($configured) { $start.Environment['BETTERRUSTPLUS_INGEST_KEY'] = $key }
     $start.Environment['Alerts__DryRun'] = 'true'
+    $start.Environment['RustSource__Enabled'] = 'false'
+    $start.Environment['DiscordBot__Enabled'] = 'false'
     $start.Environment['Alerts__AllowedServerIds__0'] = 'smoke-server'
     $start.Environment['Alerts__Rules__0__Id'] = 'smoke-rule'
     $start.Environment['Alerts__Rules__0__Kinds__0'] = 'raid'
@@ -45,12 +47,17 @@ foreach ($configured in @($false, $true)) {
         $event = @{ id = [Guid]::NewGuid().ToString(); serverId = 'smoke-server'; kind = 'raid'; occurredAt = [DateTimeOffset]::UtcNow.ToString('o'); evidence = 'confirmed' }
         $body = $event | ConvertTo-Json
         $anonymous = Invoke-WebRequest "$address/events" -Method Post -ContentType 'application/json' -Body $body -SkipHttpErrorCheck
+        $anonymousTeam = Invoke-WebRequest "$address/team" -SkipHttpErrorCheck
         if (-not $configured) {
             Assert-Check ($anonymous.StatusCode -eq 503) 'Unconfigured ingestion must fail closed.'
+            Assert-Check ($anonymousTeam.StatusCode -eq 503) 'Unconfigured team endpoint must fail closed.'
             continue
         }
         Assert-Check ($anonymous.StatusCode -eq 401) 'Missing authentication was accepted.'
+        Assert-Check ($anonymousTeam.StatusCode -eq 401) 'Team positions were exposed without authentication.'
         $headers = @{ Authorization = "Bearer $key" }
+        $team = Invoke-RestMethod "$address/team" -Headers $headers
+        Assert-Check ($team.available -eq $false -and $team.members.Count -eq 0) 'Disabled source returned live or invented positions.'
         $wrongKey = Invoke-WebRequest "$address/events" -Method Post -ContentType 'application/json' -Body $body -Headers @{ Authorization = 'Bearer incorrect' } -SkipHttpErrorCheck
         Assert-Check ($wrongKey.StatusCode -eq 401) 'Incorrect key was accepted.'
         $result = Invoke-RestMethod "$address/events" -Method Post -ContentType 'application/json' -Body $body -Headers $headers

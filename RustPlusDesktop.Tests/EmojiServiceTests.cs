@@ -54,6 +54,26 @@ public class EmojiServiceTests
             var frames = EmojiService.GetCustomEmojiFrames(emoji.Name);
             Assert.IsNotNull(frames, $"Frames for {emoji.Name} should not be null");
             Assert.IsTrue(frames.Length > 0, $"Frames for {emoji.Name} should be > 0");
+            var delays = EmojiService.GetFrameDelays(emoji.Name);
+            Assert.IsNotNull(delays);
+            Assert.AreEqual(frames.Length, delays.Length);
+            Assert.IsTrue(delays.All(delay => delay > 0), $"Frame timing for {emoji.Name} must be preserved");
+            Assert.IsTrue(frames.All(frame => frame.IsFrozen), "Background decoded frames must be safe to use on the UI thread");
+            // Read WebP ANMF durations independently of the decoder to catch lost frames/timing.
+            var data = File.ReadAllBytes(EmojiService.GetCustomEmojiWebpPath(emoji.Name)!);
+            var authoredDurations = new List<int>();
+            for (int offset = 12; offset + 8 <= data.Length;)
+            {
+                int length = checked((int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset + 4, 4)));
+                if (System.Text.Encoding.ASCII.GetString(data, offset, 4) == "ANMF")
+                {
+                    int duration = data[offset + 20] | data[offset + 21] << 8 | data[offset + 22] << 16;
+                    authoredDurations.Add(duration > 0 ? duration : 16);
+                }
+                offset = checked(offset + 8 + length + (length & 1));
+            }
+            if (authoredDurations.Count > 0)
+                CollectionAssert.AreEqual(authoredDurations.ToArray(), delays, $"Authored WebP timing for {emoji.Name}");
         }
     }
 }

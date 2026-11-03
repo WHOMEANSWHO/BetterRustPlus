@@ -13,7 +13,11 @@ public sealed class AlertOptions
     public Dictionary<string, DeliveryTarget> Targets { get; set; } = new();
 }
 
-public sealed class DeliveryTarget { public string WebhookUrl { get; set; } = ""; }
+public sealed class DeliveryTarget
+{
+    public string WebhookUrl { get; set; } = "";
+    public ulong? DiscordChannelId { get; set; }
+}
 
 public sealed class AlertRule
 {

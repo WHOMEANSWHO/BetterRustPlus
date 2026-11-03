@@ -1,16 +1,109 @@
 # BetterRustPlus alert service foundation
 
-A .NET 8 service for Windows or Linux, independent of the WPF desktop application. This is an early local development foundation, **not a deployed Rust+ listener or a production-ready bot**.
+A .NET 8 service for Windows or Linux, independent of the WPF desktop application. This includes an optional paired Rust+ source and alert delivery foundation, **not a deployed service or a production-ready bot**.
 
 ## What works
 
-- `GET /health` reports service operation, dry-run state and explicitly that no game source is connected.
+- `GET /health` reports service operation, dry-run state, configured source capabilities and current source connection state.
 - `POST /events` accepts authenticated, validated observations for cargo, airdrop, Deep Sea, raid alarms and teammate deaths.
 - Rules select event kinds, servers, delivery target, optional everyone mentions and cooldown.
 - Duplicate suppression, event-age checks and server allowlisting prevent simple replays or mixing server events.
-- Dry-run is enabled by default and never calls Discord. Optional live delivery uses official Discord webhook addresses with explicit mention restrictions.
+- Dry-run is enabled by default and never sends event alerts. Optional live delivery uses an allowlisted bot text channel or an official Discord webhook address, with explicit mention restrictions. Separately enabling the command bot connects it to Discord even in dry-run mode.
+- An opt-in paired Rust+ source polls team state/death transitions and newly visible cargo markers, and consumes Smart Alarm push updates with periodic resync. Credentials and a server exposing those data are required; this path has not been tested against a live account/server.
+- `GET /team` requires the ingest bearer key and returns timestamped last-observed team positions with online/alive flags. Missing or stale observations are explicit; no team positions are exposed through public health.
+- An opt-in Discord bot offers private, read-only `/brp-status`, `/brp-alerts` and `/brp-team` commands in configured group channels. It uses only the non-privileged Guilds intent and does not read message content.
 
-There are no Rust+ connections, automatic detectors, Steam integration, VPS provisioning or Discord application/invite flows here. A webhook is a delivery adapter, not the eventual interactive Discord bot.
+There is no universal airdrop/Deep Sea detector, Steam friends/server-presence integration or VPS provisioning here. Discord app creation and invitations are manual; the bot does not yet edit rules or acknowledge alarms. Container deployment files are included below, but they have not been deployed to a VPS.
+
+## Keep the service running on a VPS
+
+The service can run while every desktop is off. Leave the paired source disabled for supplied-event testing, or configure it to poll the group's own paired server. Hosting does not grant additional game data: raids mean configured paired Smart Alarm transitions, deaths use available team state, and airdrop/Deep Sea events still require another verified producer. `/health` reports disabled, connecting, connected, degraded and disconnected states plus freshness; liveness alone is not proof of a game connection. A successful team poll becomes stale after the configured polling interval plus 60 seconds.
+
+Use a Linux VPS with Docker Engine and the Compose plugin installed. Enable Docker at boot using your host's service manager. From this repository's `BetterRustPlus.Server/deploy` folder:
+
+```sh
+umask 077
+cp .env.example .env
+chmod 600 .env
+printf 'Generate your private key, then paste it into .env:\n'
+openssl rand -hex 32
+```
+
+Edit `.env` in your editor. Set `BETTERRUSTPLUS_INGEST_KEY` to the generated value and replace `our-server` with the exact ID your event producer will send. The example supplies separate rules for deaths, raids and world events, with everyone mentions off. Never paste the key or a webhook URL into GitHub or chat. The real `.env` is ignored by Git and excluded from the Docker build context. Anyone with Docker administrator access can inspect runtime environment values; restrict access to the VPS and Docker socket.
+
+Start in dry-run mode:
+
+```sh
+docker compose up -d --build
+docker compose ps
+curl --fail http://127.0.0.1:5088/health
+docker compose logs --tail=100 alerts
+```
+
+The container runs as the Microsoft image's non-root `app` user with a read-only filesystem, temporary scratch space and bounded logs. It listens on all container interfaces, while Compose publishes port 5088 **only to the VPS loopback interface**. `restart: unless-stopped` restarts an exited process and starts it after Docker restarts; Docker must itself start at boot. An unhealthy probe marks the container unhealthy but does not itself restart a still-running process. The health probe checks HTTP liveness, not game-source availability or successful Discord delivery.
+
+### Connect your own paired server
+
+The disabled `RustSource` fields in `.env.example` are optional. To enable polling, set `RustSource__Enabled=true` and supply `ServerId` matching the alert allowlist, the paired `Host`/companion `Port`, your `SteamId` and paired `PlayerToken`. If your connection requires the companion relay, supply both `CompanionServerId` and `AuthToken`; these are distinct from your ingest bearer key. Use values from your own valid Rust+ pairing. No login credentials should be guessed or copied from another player. The service has no account-login/export UI yet, so transferring valid pairing values is currently a manual setup step.
+
+Add only your paired Smart Alarm entity IDs using `RustSource__AlarmEntityIds__0`, `__1`, etc. `PollSeconds` accepts 5–300, default 15. Cargo is detected when a cargo marker first appears after a baseline; an alarm must transition from observed inactive to active. The initial snapshot and reconnect baseline do not generate historical alarms. Death notices use a fresh death timestamp or observed live-to-dead transition and label the previous observed grid **last seen**. They cannot report the killer, weapon or an exact unobserved death position. Observations missed between polls or while disconnected may be unavailable. Live source behavior still needs verification on a supported paired server before relying on it for raids.
+
+Alarm updates are processed independently of polling. Failed/busy alarm deliveries keep their original IDs in a bounded in-memory retry queue with a one-second backoff, allowing other ready observations to proceed. Events expire after five minutes; buffer overflow is reported as degraded operation. Each actual delivery attempt still depends on target response times, so this is not a hard latency or exactly-once guarantee.
+
+Recreate the container after changing source settings and inspect `/health` and logs. Source failures produce a generic warning without printing paired credentials and reconnect after a delay. Current retries are bounded and in memory; no delivery guarantee is implied. Verify source availability with every desktop off before assuming the VPS replaces a running game client for a particular server.
+
+For a temporary private connection from your own computer, an SSH tunnel can expose the loopback endpoint locally:
+
+```sh
+ssh -N -L 5088:127.0.0.1:5088 your-user@your-vps
+```
+
+An approved producer can then send to `http://127.0.0.1:5088/events` on your computer with its bearer key. This tunnel depends on that computer; the optional built-in paired source runs directly on the VPS and does not use this tunnel. Any other always-on producer needs an independently available connection. Do not change the port mapping to public unencrypted HTTP. A public endpoint requires a configured HTTPS reverse proxy and access controls; no domain, certificates or firewall changes are provisioned here.
+
+To enable Discord webhook delivery later, create a webhook in the intended Discord channel, add its URL using `Alerts__Targets__primary__WebhookUrl`, then deliberately set `Alerts__DryRun=false`. Or configure bot delivery as described below. Set only the raid rule's `MentionEveryone=true` if the group wants raid pings, and ensure the selected Discord sender has the required mention permission. This starts real messages for matching events. Keep dry-run enabled until you have reviewed the server ID and rules.
+
+### Add the optional command bot to your Discord
+
+1. Create a group-owned application in the [Discord developer portal](https://discord.com/developers/applications) and create its bot. Keep the bot token private; it is different from the application/client ID, webhook URL and Rust+ credentials.
+2. In the portal's OAuth2 URL generator, select `bot` and `applications.commands`. Request only **View Channels** and **Send Messages** for the command channel. Do not request Administrator, Message Content, Server Members or Presence intents. Group members need **Use Application Commands** in that channel. Invite the app to your group's server using the generated URL.
+3. Enable Discord's Developer Mode to copy the group's server ID and command channel ID. In the VPS `.env`, set `DiscordBot__Enabled=true`, `DiscordBot__Token`, `DiscordBot__GuildId`, and `DiscordBot__AllowedChannelIds__0`. Add `__1`, etc. for other approved channels, up to 32. At least one channel is required. Only the configured guild and channels are authorized; direct messages and other guilds are denied.
+4. Recreate the container. Enabling the bot connects to Discord and registers this app's three guild commands. It does not register global commands or remove unrelated commands. If registration fails, check the configured guild, invitation scopes and connectivity; logs deliberately omit tokens and Discord request details. No live bot login or registration has been verified by the agent.
+
+All command replies are **ephemeral** (visible to the invoking member), suppress mentions, and truncate large lists with an explicit remaining count:
+
+| Command | Result |
+| --- | --- |
+| `/brp-status` | Delivery mode, source state/freshness, last successful team poll and rule count. A connected/degraded source is not proof every detector works. |
+| `/brp-alerts` | Configured trigger kinds, server filters, cooldowns and everyone-mention settings. It does not expose webhook credentials or modify rules. |
+| `/brp-team` | Latest observed member names, online/alive state and last-seen grids, with observation time and stale/unavailable labels. It cannot reveal withheld positions or an exact unobserved death location. |
+
+The bot stays online with the VPS while your desktops are off. Source data still requires valid server pairing and the server exposing the requested information. Read-only commands do not change configuration, invite members, send a test alarm or ping everyone. For now, edit rules on the VPS.
+
+To deliver event alerts **through the bot** instead of a webhook, configure a target with an approved guild text-channel ID:
+
+```text
+Alerts__Targets__primary__DiscordChannelId=YOUR_ALERT_CHANNEL_ID
+```
+
+Add that channel to `DiscordBot__AllowedChannelIds` and ensure the bot can view/send there. Remove `Alerts__Targets__primary__WebhookUrl` for this target; a target must have exactly one delivery route. Keep `Alerts__DryRun=true` to check rules without alert messages, then deliberately switch it to false when ready. For real raid pings, set the raid rule's `MentionEveryone=true` and grant the bot **Mention @everyone, @here and All Roles** in the alert channel. This permission is unnecessary for ordinary alerts or slash-command replies. The sender permits everyone mentions only for explicitly opted-in alerts; command replies suppress all mentions. Bot delivery supports guild text channels, not direct messages, forums or threads. If the bot disconnects, delivery reports failure for the caller's existing bounded retry path; it does not pretend a message was sent. No live bot alert has been sent by the agent.
+
+Bot-specific checks run offline, without a token or Discord connection:
+
+```sh
+dotnet run --project Bot.Tests/BetterRustPlus.Bot.Tests.csproj
+```
+
+The bot uses [Discord.Net's guild application commands](https://docs.discordnet.dev/guides/int_basics/application-commands/slash-commands/creating-slash-commands.html) and Discord's [application-command scopes and permissions](https://docs.discord.com/developers/docs/interactions/slash-commands).
+
+After changing `.env`, recreate the container so the new values take effect:
+
+```sh
+docker compose up -d --force-recreate
+```
+
+To update code, pull the intended reviewed branch and run `docker compose up -d --build` again. To stop it, use `docker compose down`. Current replay/cooldown state is in memory and resets on any restart; there is no durable queue or persistent game pairing state. No volume is mounted because this version has no durable state to preserve. Keep a protected backup of your host configuration and rotate the ingest key/webhook if exposed. No VPS deployment or container runtime test has yet been performed from this checkout.
+
+The deployment uses [Microsoft's .NET container non-root user](https://learn.microsoft.com/en-us/dotnet/core/compatibility/containers/8.0/app-user) and the documented [Compose service settings](https://docs.docker.com/reference/compose-file/services/). The repository root is the build context so the checked-in public `packages-local` RustPlusApi feed and `nuget.config` are available. `Dockerfile.dockerignore` restricts that context to the service and feed; the Windows desktop, private map parser, real environment files and build output are excluded.
 
 ## Run locally
 
@@ -21,7 +114,7 @@ dotnet build
 dotnet run --no-build
 ```
 
-The default address is `http://127.0.0.1:5088`. Health is public on this loopback interface. Ingestion returns **503** until `BETTERRUSTPLUS_INGEST_KEY` is set to a random value at least 32 characters long. It then requires `Authorization: Bearer <key>` and returns **401** for an invalid key. Never commit the key or webhook credentials. Supply them through the host's environment/secret facility.
+The default address is `http://127.0.0.1:5088`. Health is public on this loopback interface. Event ingestion and the `/team` snapshot endpoint return **503** until `BETTERRUSTPLUS_INGEST_KEY` is set to a random value at least 32 characters long. They then require `Authorization: Bearer <key>` and return **401** for an invalid key. Never commit the key, pairing credentials, bot token or webhook URL. Supply them through the host's environment/secret facility.
 
 Configuration uses standard .NET environment names. For example, in a development shell, set a newly generated random ingest key and:
 
@@ -34,7 +127,7 @@ Alerts__Rules__0__Target=primary
 Alerts__Rules__0__MentionEveryone=false
 ```
 
-Keep `Alerts__DryRun=true` while testing. Once explicitly ready to send real messages, configure `Alerts__Targets__primary__WebhookUrl` with your Discord webhook URL and set `Alerts__DryRun=false`. Everyone mentions require per-rule `MentionEveryone=true`; player-provided names cannot insert a real mention. Discord permissions and user notification settings still govern actual notifications. No live delivery has been tested by the agent.
+Keep `Alerts__DryRun=true` while testing event processing. Once explicitly ready to send real messages, configure one delivery route per target (webhook URL or enabled/allowlisted bot channel) and set `Alerts__DryRun=false`. Everyone mentions require per-rule `MentionEveryone=true`; player-provided names cannot insert a real mention. Discord permissions and user notification settings still govern actual notifications. Dry-run does not disable an explicitly enabled bot's Discord connection or command replies. No live delivery has been tested by the agent.
 
 `ASPNETCORE_URLS` can override binding, but do not expose this development HTTP endpoint publicly. A real deployment needs TLS termination, network restrictions, securely stored credentials, persistent state, monitoring and operational review. The per-process ingestion limit is 60 requests/minute, with no request queue and a 16 KiB body limit.
 
@@ -75,10 +168,10 @@ This launches and stops temporary loopback hosts and tests health, missing confi
 
 ## Remaining production work
 
-- Actual Rust+ pairing/connection and verified event sources; unavailable game data cannot be created by keeping this service online.
+- Live verification of the optional paired source, a pairing setup UI and additional verified event sources; unavailable game data cannot be created by keeping this service online.
 - Persistent delivery/deduplication and cooldown state: current state is memory-only and resets on restart.
 - A durable queue/outbox, crash recovery and handling Discord rate limits/retries; delivery is not guaranteed exactly once when a connection fails after Discord receives a message.
-- Interactive Discord bot commands, acknowledgements, role selection and a desktop configuration UI.
-- Hosting, TLS, operational health, key rotation, secure backups and deployment packaging.
+- Live validation of the read-only Discord bot, editable alert commands, acknowledgements, role selection and a desktop configuration UI.
+- Actual hosting, TLS, operational monitoring, key rotation and secure backups. Container packaging is provided, but it still needs runtime verification on the target host.
 
 No secrets or game credentials belong in the repository. No external messages are sent during the included tests.

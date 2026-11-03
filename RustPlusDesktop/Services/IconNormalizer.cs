@@ -1,8 +1,6 @@
 using System;
 using System.IO;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace RustPlusDesk.Services;
 
@@ -11,8 +9,7 @@ namespace RustPlusDesk.Services;
 /// 40x40 PNG (the only size the app renders). This both saves space — the source art is often
 /// 256/512px — and lets the sidebar hover decoration (which requires 40x40 files) find icons to use.
 ///
-/// Lives in its own file because ImageSharp's Image/Color/Size types collide with the System.Windows
-/// types used across MainWindow.
+/// Uses the same MIT-licensed decoder as animated emoji playback.
 /// </summary>
 public static class IconNormalizer
 {
@@ -26,19 +23,22 @@ public static class IconNormalizer
     {
         try
         {
-            using var image = Image.Load(input);
-            if (image.Width == Size && image.Height == Size) return input; // already correct
-
-            image.Mutate(x => x.Resize(new ResizeOptions
+            using var data = SKData.CreateCopy(input);
+            using var codec = SKCodec.Create(data);
+            if (codec is null || !ImageDecodeLimits.IsSafeCanvas(codec.Info.Width, codec.Info.Height)) return input;
+            using var image = SKBitmap.Decode(codec);
+            if (image is null) return input;
+            using var output = new SKBitmap(Size, Size, SKColorType.Bgra8888, SKAlphaType.Premul);
+            using (var canvas = new SKCanvas(output))
             {
-                Size = new SixLabors.ImageSharp.Size(Size, Size),
-                Mode = ResizeMode.Pad,
-                PadColor = SixLabors.ImageSharp.Color.Transparent,
-            }));
-
-            using var ms = new MemoryStream();
-            image.Save(ms, new PngEncoder());
-            return ms.ToArray();
+                canvas.Clear(SKColors.Transparent);
+                float scale = Math.Min((float)Size / image.Width, (float)Size / image.Height);
+                float width = image.Width * scale, height = image.Height * scale;
+                var destination = SKRect.Create((Size - width) / 2, (Size - height) / 2, width, height);
+                canvas.DrawBitmap(image, destination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.None));
+            }
+            using var encoded = output.Encode(SKEncodedImageFormat.Png, 100);
+            return encoded?.ToArray() ?? input;
         }
         catch
         {
