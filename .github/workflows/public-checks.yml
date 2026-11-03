@@ -38,85 +38,65 @@ jobs:
         run: dotnet test BetterRustPlus.Companion.Tests/BetterRustPlus.Companion.Tests.csproj -c Release --logger trx
 
   alert-service:
-    name: Linux alert service
-    runs-on: ubuntu-latest
+    name: Native Linux listener
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Test guided VPS setup without external connections
-        run: python3 -m unittest discover -s BetterRustPlus.Server/deploy/tests -v
-      - name: Check private setup values with Compose without starting containers
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import importlib.util, json, pathlib, subprocess, tempfile
-          path = pathlib.Path('BetterRustPlus.Server/deploy/setup.py')
-          spec = importlib.util.spec_from_file_location('vps_setup', path)
-          setup = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(setup)
-          with tempfile.TemporaryDirectory() as scratch:
-              directory = pathlib.Path(scratch)
-              value = 'literal-$UNDEFINED-${UNDEFINED}-#value'
-              config = setup.base_config('ci-server')
-              config['SETUP_LITERAL_PROBE'] = value
-              setup.write_config(directory / '.env', config)
-              (directory / 'compose.yaml').write_text(
-                  'services:\n  probe:\n    image: busybox\n    env_file:\n      - .env\n')
-              result = subprocess.run(['docker', 'compose', 'config', '--format', 'json'],
-                  cwd=directory, capture_output=True, text=True, check=True)
-              environment = json.loads(result.stdout)['services']['probe']['environment']
-              assert environment['SETUP_LITERAL_PROBE'] == value
-              assert environment['Alerts__DryRun'] == 'true'
-              assert environment['RustSource__Enabled'] == 'false'
-              assert environment['DiscordBot__Enabled'] == 'false'
-          print('Private env serialization and test-mode defaults verified by Compose; no containers started.')
-          PY
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Test guided VPS setup without external connections
+        run: python3 -m unittest discover -s BetterRustPlus.Server/deploy/tests -v
       - name: Build the service
         run: dotnet build BetterRustPlus.Server/BetterRustPlus.Server.csproj -c Release
       - name: Check alert processing without Discord delivery
         run: dotnet run --project BetterRustPlus.Server/Tests/BetterRustPlus.Alerts.Tests.csproj -c Release
       - name: Check Discord bot policy without connecting
         run: dotnet run --project BetterRustPlus.Server/Bot.Tests/BetterRustPlus.Bot.Tests.csproj -c Release
-      - name: Build VPS container
-        run: docker build -f BetterRustPlus.Server/Dockerfile -t betterrustplus-alerts:ci .
-      - name: Check container locally without game or Discord connections
+      - name: Prepare private native test configuration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys
+          directory = pathlib.Path('BetterRustPlus.Server/deploy').resolve()
+          sys.path.insert(0, str(directory))
+          import setup_docker as config
+          values = config.base_config('ci-server')
+          values['BETTERRUSTPLUS_INGEST_KEY'] += '-$UNDEFINED-${UNDEFINED}-#literal'
+          config.write_config(directory / '.env', values)
+          print('Native test configuration prepared; Rust+ and Discord remain disabled.')
+          PY
+      - name: Install and check native systemd service without game or Discord connections
         shell: bash
         run: |
           set -euo pipefail
-          export BETTERRUSTPLUS_INGEST_KEY="$(openssl rand -hex 32)"
-          echo "::add-mask::$BETTERRUSTPLUS_INGEST_KEY"
-          trap 'docker logs betterrustplus-ci; docker rm -f betterrustplus-ci' EXIT
-          docker run -d --name betterrustplus-ci --read-only --tmpfs /tmp:rw,noexec,nosuid,size=32m \
-            --cap-drop ALL --security-opt no-new-privileges:true \
-            -p 127.0.0.1:5088:5088 --env BETTERRUSTPLUS_INGEST_KEY \
-            -e Alerts__DryRun=true -e RustSource__Enabled=false -e DiscordBot__Enabled=false \
-            -e Alerts__AllowedServerIds__0=ci-server \
-            -e Alerts__Rules__0__Id=ci-cargo -e Alerts__Rules__0__Kinds__0=cargo \
-            betterrustplus-alerts:ci
-          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 --max-time 3 \
-            http://127.0.0.1:5088/health > /dev/null
-          test "$(docker exec betterrustplus-ci id -u)" -ne 0
+          trap 'sudo journalctl -u betterrustplus -n 50 --no-pager; sudo systemctl disable --now betterrustplus' EXIT
+          sudo env PATH="$PATH" DOTNET_ROOT="${DOTNET_ROOT:-/usr/share/dotnet}" python3 BetterRustPlus.Server/deploy/setup.py --install
+          sudo systemd-analyze verify /etc/systemd/system/betterrustplus.service
+          test "$(sudo systemctl show betterrustplus -p DynamicUser --value)" = yes
+          test "$(sudo systemctl show betterrustplus -p ActiveState --value)" = active
           python3 - <<'PY'
-          import datetime, json, os, urllib.request, uuid
+          import datetime, json, pathlib, subprocess, urllib.request, uuid
+          source = pathlib.Path('BetterRustPlus.Server/deploy/.env').read_text()
+          key = next(line.split('=', 1)[1][1:-1] for line in source.splitlines()
+                     if line.startswith('BETTERRUSTPLUS_INGEST_KEY='))
           base = 'http://127.0.0.1:5088'
           with urllib.request.urlopen(base + '/health', timeout=5) as response:
               health = json.load(response)
-          assert health['status'] == 'running'
+          pid = int(subprocess.check_output(['systemctl', 'show', 'betterrustplus', '-p', 'MainPID', '--value']))
+          assert health['processId'] == pid and pid > 0
           assert health['mode'] == 'dry-run'
-          assert health['ingestionConfigured'] is True
           assert health['gameSourceConnected'] is False
-          observation = dict(id=str(uuid.uuid4()), serverId='ci-server', kind='cargo',
-                             occurredAt=datetime.datetime.now(datetime.timezone.utc).isoformat(), evidence='confirmed')
+          assert health['discordBot'] == 'disabled'
+          event = dict(id=str(uuid.uuid4()), serverId='ci-server', kind='cargo',
+                       occurredAt=datetime.datetime.now(datetime.timezone.utc).isoformat(), evidence='confirmed')
           def send():
-              request = urllib.request.Request(base + '/events', data=json.dumps(observation).encode(),
-                  headers={'Content-Type': 'application/json',
-                           'Authorization': 'Bearer ' + os.environ['BETTERRUSTPLUS_INGEST_KEY']})
+              request = urllib.request.Request(base + '/events', data=json.dumps(event).encode(),
+                  headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key})
               with urllib.request.urlopen(request, timeout=5) as response:
                   return json.load(response)
-          first = send()
-          assert first['simulated'] == 1 and first['delivered'] == 0, first
+          result = send()
+          assert result['simulated'] == 1 and result['delivered'] == 0
           assert send()['duplicate'] == 1
-          print('Container liveness, non-root execution, dry-run ingestion and duplicate checks passed.')
+          print('Native startup, process identity, private env literals and dry-run delivery checks passed.')
           PY

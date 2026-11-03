@@ -68,6 +68,7 @@ app.UseRateLimiter();
 app.MapGet("/health", (RustSourceState source, DiscordBotState bot) => Results.Ok(new
 {
     status = "running",
+    processId = Environment.ProcessId,
     mode = options.DryRun ? "dry-run" : "discord-delivery-enabled",
     ingestionConfigured = keyConfigured && options.AllowedServerIds.Length > 0,
     gameSourceConnected = source.Snapshot.IsFresh,

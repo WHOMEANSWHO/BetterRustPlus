@@ -13,46 +13,32 @@ A .NET 8 service for Windows or Linux, independent of the WPF desktop applicatio
 - `GET /team` requires the ingest bearer key and returns timestamped last-observed team positions with online/alive flags. Missing or stale observations are explicit; no team positions are exposed through public health.
 - An opt-in Discord bot offers private, read-only `/brp-status`, `/brp-alerts` and `/brp-team` commands in configured group channels. It uses only the non-privileged Guilds intent and does not read message content.
 
-There is no universal airdrop/Deep Sea detector, Steam friends/server-presence integration or VPS provisioning here. Discord app creation and invitations are manual; the bot does not yet edit rules or acknowledge alarms. Container deployment files are included below, but they have not been deployed to a VPS.
+There is no universal airdrop/Deep Sea detector, Steam friends/server-presence integration or VPS provisioning here. Discord app creation and invitations are manual; the bot does not yet edit rules or acknowledge alarms. Native service deployment is provided, but it has not been installed on a real VPS here.
 
 ## Keep the service running on a VPS
 
-**Start here:** the [guided VPS setup](deploy/README.md) downloads only the listener, creates private settings, and walks through optional Rust+ and Discord configuration. Run `python3 BetterRustPlus.Server/deploy/setup.py` from the repository folder. Manual setup details follow for advanced configuration.
+Use the [native VPS setup guide](deploy/README.md). The listener installs directly as `betterrustplus.service` under systemd, with automatic boot startup, crash recovery and a restricted service user. Docker is not required. Configuration is prepared interactively, and installation needs sudo.
 
-The service can run while every desktop is off. Leave the paired source disabled for supplied-event testing, or configure it to poll the group's own paired server. Hosting does not grant additional game data: raids mean configured paired Smart Alarm transitions, deaths use available team state, and airdrop/Deep Sea events still require another verified producer. `/health` reports disabled, connecting, connected, degraded and disconnected states plus freshness; liveness alone is not proof of a game connection. A successful team poll becomes stale after the configured polling interval plus 60 seconds.
-
-Use a Linux VPS with Docker Engine and the Compose plugin installed. Enable Docker at boot using your host's service manager. From this repository's `BetterRustPlus.Server/deploy` folder:
+From the checked-out repository after installing Python 3 and the .NET 8 SDK:
 
 ```sh
-umask 077
-cp .env.example .env
-chmod 600 .env
-printf 'Generate your private key, then paste it into .env:\n'
-openssl rand -hex 32
+python3 BetterRustPlus.Server/deploy/setup.py --configure-only
+sudo python3 BetterRustPlus.Server/deploy/setup.py --install
 ```
 
-Edit `.env` in your editor. Set `BETTERRUSTPLUS_INGEST_KEY` to the generated value and replace `our-server` with the exact ID your event producer will send. The example supplies separate rules for deaths, raids and world events, with everyone mentions off. Never paste the key or a webhook URL into GitHub or chat. The real `.env` is ignored by Git and excluded from the Docker build context. Anyone with Docker administrator access can inspect runtime environment values; restrict access to the VPS and Docker socket.
+Installed binaries live under `/opt/betterrustplus`; private settings live in `/etc/betterrustplus/listener.env`. Installation and updates preserve existing settings, validate startup against the service's actual process ID, and reselect the prior release if an updated release fails startup. The service binds only to `127.0.0.1:5088`. No domain or incoming public API port is needed for the built-in source and bot.
 
-Start in dry-run mode:
-
-```sh
-docker compose up -d --build
-docker compose ps
-curl --fail http://127.0.0.1:5088/health
-docker compose logs --tail=100 alerts
-```
-
-The container runs as the Microsoft image's non-root `app` user with a read-only filesystem, temporary scratch space and bounded logs. It listens on all container interfaces, while Compose publishes port 5088 **only to the VPS loopback interface**. `restart: unless-stopped` restarts an exited process and starts it after Docker restarts; Docker must itself start at boot. An unhealthy probe marks the container unhealthy but does not itself restart a still-running process. The health probe checks HTTP liveness, not game-source availability or successful Discord delivery.
+The service can run while every desktop is off. Hosting does not grant unavailable game data: raids mean configured paired Smart Alarm transitions, deaths use available team state, and airdrop/Deep Sea events need another verified producer. `/health` reports source state and freshness; service liveness is not proof of a working detector. Data and retry state remain in memory.
 
 ### Connect your own paired server
 
-The disabled `RustSource` fields in `.env.example` are optional. To enable polling, set `RustSource__Enabled=true` and supply `ServerId` matching the alert allowlist, the paired `Host`/companion `Port`, your `SteamId` and paired `PlayerToken`. If your connection requires the companion relay, supply both `CompanionServerId` and `AuthToken`; these are distinct from your ingest bearer key. Use values from your own valid Rust+ pairing. No login credentials should be guessed or copied from another player. The service has no account-login/export UI yet, so transferring valid pairing values is currently a manual setup step.
+The disabled `RustSource` fields in `.env.example` are optional. The native wizard writes the selected values to the installed `/etc/betterrustplus/listener.env`. To enable polling, set `RustSource__Enabled=true` and supply `ServerId` matching the alert allowlist, the paired `Host`/companion `Port`, your `SteamId` and paired `PlayerToken`. If your connection requires the companion relay, supply both `CompanionServerId` and `AuthToken`; these are distinct from your ingest bearer key. Use values from your own valid Rust+ pairing. No login credentials should be guessed or copied from another player. The service has no account-login/export UI yet, so transferring valid pairing values is currently a manual setup step.
 
 Add only your paired Smart Alarm entity IDs using `RustSource__AlarmEntityIds__0`, `__1`, etc. `PollSeconds` accepts 5–300, default 15. Cargo is detected when a cargo marker first appears after a baseline; an alarm must transition from observed inactive to active. The initial snapshot and reconnect baseline do not generate historical alarms. Death notices use a fresh death timestamp or observed live-to-dead transition and label the previous observed grid **last seen**. They cannot report the killer, weapon or an exact unobserved death position. Observations missed between polls or while disconnected may be unavailable. Live source behavior still needs verification on a supported paired server before relying on it for raids.
 
 Alarm updates are processed independently of polling. Failed/busy alarm deliveries keep their original IDs in a bounded in-memory retry queue with a one-second backoff, allowing other ready observations to proceed. Events expire after five minutes; buffer overflow is reported as degraded operation. Each actual delivery attempt still depends on target response times, so this is not a hard latency or exactly-once guarantee.
 
-Recreate the container after changing source settings and inspect `/health` and logs. Source failures produce a generic warning without printing paired credentials and reconnect after a delay. Current retries are bounded and in memory; no delivery guarantee is implied. Verify source availability with every desktop off before assuming the VPS replaces a running game client for a particular server.
+Restart betterrustplus.service after changing the installed source settings and inspect `/health` and logs. Source failures produce a generic warning without printing paired credentials and reconnect after a delay. Current retries are bounded and in memory; no delivery guarantee is implied. Verify source availability with every desktop off before assuming the VPS replaces a running game client for a particular server.
 
 For a temporary private connection from your own computer, an SSH tunnel can expose the loopback endpoint locally:
 
@@ -68,8 +54,8 @@ To enable Discord webhook delivery later, create a webhook in the intended Disco
 
 1. Create a group-owned application in the [Discord developer portal](https://discord.com/developers/applications) and create its bot. Keep the bot token private; it is different from the application/client ID, webhook URL and Rust+ credentials.
 2. In the portal's OAuth2 URL generator, select `bot` and `applications.commands`. Request only **View Channels** and **Send Messages** for the command channel. Do not request Administrator, Message Content, Server Members or Presence intents. Group members need **Use Application Commands** in that channel. Invite the app to your group's server using the generated URL.
-3. Enable Discord's Developer Mode to copy the group's server ID and command channel ID. In the VPS `.env`, set `DiscordBot__Enabled=true`, `DiscordBot__Token`, `DiscordBot__GuildId`, and `DiscordBot__AllowedChannelIds__0`. Add `__1`, etc. for other approved channels, up to 32. At least one channel is required. Only the configured guild and channels are authorized; direct messages and other guilds are denied.
-4. Recreate the container. Enabling the bot connects to Discord and registers this app's three guild commands. It does not register global commands or remove unrelated commands. If registration fails, check the configured guild, invitation scopes and connectivity; logs deliberately omit tokens and Discord request details. No live bot login or registration has been verified by the agent.
+3. Enable Discord's Developer Mode to copy the group's server ID and command channel ID. In `/etc/betterrustplus/listener.env`, set `DiscordBot__Enabled=true`, `DiscordBot__Token`, `DiscordBot__GuildId`, and `DiscordBot__AllowedChannelIds__0`. Add `__1`, etc. for other approved channels, up to 32. At least one channel is required. Only the configured guild and channels are authorized; direct messages and other guilds are denied.
+4. Run `sudo systemctl restart betterrustplus`. Enabling the bot connects to Discord and registers this app's three guild commands. It does not register global commands or remove unrelated commands. If registration fails, check the configured guild, invitation scopes and connectivity; logs deliberately omit tokens and Discord request details. No live bot login or registration has been verified by the agent.
 
 All command replies are **ephemeral** (visible to the invoking member), suppress mentions, and truncate large lists with an explicit remaining count:
 
@@ -97,16 +83,16 @@ dotnet run --project Bot.Tests/BetterRustPlus.Bot.Tests.csproj
 
 The bot uses [Discord.Net's guild application commands](https://docs.discordnet.dev/guides/int_basics/application-commands/slash-commands/creating-slash-commands.html) and Discord's [application-command scopes and permissions](https://docs.discord.com/developers/docs/interactions/slash-commands).
 
-After changing `.env`, recreate the container so the new values take effect:
+After editing `/etc/betterrustplus/listener.env`, apply settings with:
 
 ```sh
-docker compose up -d --force-recreate
+sudo systemctl restart betterrustplus
+sudo journalctl -u betterrustplus -n 50 --no-pager
 ```
 
-To update code, pull the intended reviewed branch and run `docker compose up -d --build` again. To stop it, use `docker compose down`. Current replay/cooldown state is in memory and resets on any restart; there is no durable queue or persistent game pairing state. No volume is mounted because this version has no durable state to preserve. Keep a protected backup of your host configuration and rotate the ingest key/webhook if exposed. No VPS deployment or container runtime test has yet been performed from this checkout.
+To update code, pull the intended reviewed branch and run the native installer with `--install`; installed credentials are preserved. Stop it with `sudo systemctl stop betterrustplus`, or disable boot startup with `sudo systemctl disable --now betterrustplus`. Runtime replay/cooldown state resets on restart. Protect and back up the installed settings; no actual VPS has been configured from this checkout.
 
-The deployment uses [Microsoft's .NET container non-root user](https://learn.microsoft.com/en-us/dotnet/core/compatibility/containers/8.0/app-user) and the documented [Compose service settings](https://docs.docker.com/reference/compose-file/services/). The repository root is the build context so the checked-in public `packages-local` RustPlusApi feed and `nuget.config` are available. `Dockerfile.dockerignore` restricts that context to the service and feed; the Windows desktop, private map parser, real environment files and build output are excluded.
-
+The deployment follows [Microsoft's Linux service-hosting guidance](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/linux-nginx?view=aspnetcore-8.0) and [systemd execution settings](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html). The native installer builds only the listener and its public package feed, not the Windows desktop or private map parser.
 ## Run locally
 
 Install the .NET 8 SDK, then from this folder:

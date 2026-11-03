@@ -13,7 +13,7 @@ import warnings
 from unittest.mock import patch
 
 
-SCRIPT = Path(__file__).resolve().parents[1] / "setup.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "setup_docker.py"
 SPEC = importlib.util.spec_from_file_location("vps_setup", SCRIPT)
 setup = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(setup)

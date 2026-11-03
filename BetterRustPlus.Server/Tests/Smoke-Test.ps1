@@ -42,6 +42,7 @@ foreach ($configured in @($false, $true)) {
             try { $health = Invoke-RestMethod "$address/health" -TimeoutSec 1; $ready = $true; break } catch { Start-Sleep -Milliseconds 200 }
         }
         Assert-Check $ready 'Health endpoint did not become ready.'
+        Assert-Check ($health.processId -eq $process.Id) 'Health must identify the temporary host, not another process on the port.'
         Assert-Check ($health.gameSourceConnected -eq $false) 'Health falsely reports a game connection.'
         Assert-Check ($health.mode -eq 'dry-run') 'Smoke test must never enable live Discord delivery.'
         $event = @{ id = [Guid]::NewGuid().ToString(); serverId = 'smoke-server'; kind = 'raid'; occurredAt = [DateTimeOffset]::UtcNow.ToString('o'); evidence = 'confirmed' }

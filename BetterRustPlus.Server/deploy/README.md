@@ -1,67 +1,75 @@
-# Easy VPS setup
+# Easy VPS setup without Docker
 
-This runs the BetterRustPlus listener and optional Discord bot while your PC is asleep or off. It does not run the Windows desktop app. This is a development deployment; real Rust+ pairing and Discord delivery still need acceptance testing.
+This installs the BetterRustPlus listener and optional Discord bot directly as a Linux background service. It runs while your PC is asleep or off, starts at VPS boot and restarts after a crash. It does not run the Windows desktop application.
 
 ## 1. Prepare the VPS
 
-Use a Linux VPS with Python 3, Git, Docker Engine and the Docker Compose plugin. Ubuntu 24.04 LTS is a supported Docker host. If your host offers a Docker-ready Ubuntu image, it saves the Docker installation step. Otherwise follow [Docker's official Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/), including its verification step. Docker must start at boot.
+Use a Linux VPS with systemd, such as Ubuntu 24.04 LTS, on x64 or ARM64. In your SSH terminal on Ubuntu 24.04:
 
-The listener does not need a GPU or the desktop application's assets. The initial container build uses more resources than simply running the listener. Resource requirements have not been benchmarked; do not assume an arbitrary smallest VPS plan can build or run it reliably.
+```sh
+sudo apt-get update
+sudo apt-get install -y git python3 dotnet-sdk-8.0
+```
 
-Run the setup as the account that can access Docker. If Docker reports a permissions error, use your host's documented Docker-access setup; the wizard will not change user permissions or install system software.
+The .NET SDK builds the listener once during installation. The installed application includes its runtime. See [Microsoft's Ubuntu instructions](https://learn.microsoft.com/en-us/dotnet/core/install/linux-ubuntu-install) for other distributions or missing packages. No Docker, GPU, domain or public API port is required. Resource use has not been benchmarked; building needs more resources than running the listener.
 
-## 2. Download just the listener and run setup
-
-In your VPS terminal:
+## 2. Download only the listener
 
 ```sh
 git clone --depth 1 --filter=blob:none --sparse --branch betterrustplus/navigation https://github.com/WHOMEANSWHO/BetterRustPlus.git
 cd BetterRustPlus
 git sparse-checkout set BetterRustPlus.Server packages-local
-python3 BetterRustPlus.Server/deploy/setup.py
 ```
 
-This uses the development branch, not a released version. The sparse checkout retains the root NuGet configuration needed for the container build, while leaving out the Windows application.
+This is the development branch, not a released version. The sparse checkout retains root build configuration while leaving out the Windows application.
 
-The wizard asks for:
+## 3. Configure and install
 
-- A short name identifying your group's paired server.
-- Optional Rust+ pairing values and Smart Alarm entity IDs.
-- An optional Discord webhook or your own Discord bot's token, server ID and channel ID.
+```sh
+python3 BetterRustPlus.Server/deploy/setup.py --configure-only
+sudo python3 BetterRustPlus.Server/deploy/setup.py --install
+```
 
-Private values are entered through hidden prompts. The ingest key is generated automatically, not pasted into the terminal output. The wizard writes a private `.env` beside the Compose file and refuses to replace an existing one. Keep that file on the VPS and out of GitHub/chat.
+The wizard asks for a short server name, optional Rust+ pairing values/Smart Alarm IDs, and optional Discord webhook or bot details. Private values use hidden prompts; an ingest key is generated without displaying it. You can leave the optional integrations disabled to test the service first. This does not detect game events until a valid source is configured. Enabling the command bot connects it to Discord even while event alerts remain in test mode.
 
-The initial configuration uses **test mode**: event alerts are simulated, and everyone mentions are off. A separately enabled Discord bot still connects and answers commands in test mode. Leave both optional integrations disabled if you only want a local service test.
+Installation builds the native application, installs it under `/opt/betterrustplus`, copies the private settings to `/etc/betterrustplus/listener.env`, and installs `betterrustplus.service`. The service runs with a restricted temporary user rather than root. Its API stays on `127.0.0.1:5088`. Settings and unknown existing service files are preserved; an update never silently overwrites installed credentials.
 
-The wizard asks before building and starting the container, then checks service health. It distinguishes a running service from a connected Rust+ source. Without valid pairing, a running container cannot detect game events.
+The installer checks startup before reporting success. If an updated release fails, it reselects the previous release. This is a startup rollback, not a guarantee that live pairing or Discord delivery works. The initial configuration uses test mode and disables everyone mentions.
 
-## 3. Check or restart it later
-
-From the repository folder:
+## 4. Check, restart or stop
 
 ```sh
 python3 BetterRustPlus.Server/deploy/setup.py --status
-python3 BetterRustPlus.Server/deploy/setup.py --check
-python3 BetterRustPlus.Server/deploy/setup.py --start
+sudo systemctl status betterrustplus --no-pager
+sudo journalctl -u betterrustplus -n 50 --no-pager
+sudo systemctl restart betterrustplus
+sudo systemctl stop betterrustplus
 ```
 
-`--status` checks the local service. `--check` checks deployment prerequisites. `--start` uses your existing private configuration and builds/starts the service without regenerating keys. To create configuration without starting anything, use `--configure-only`.
+Use `sudo systemctl disable --now betterrustplus` if you also want to stop automatic startup. Check prerequisites with `python3 BetterRustPlus.Server/deploy/setup.py --check`.
 
-For recent service messages:
+## 5. Enable real alerts after testing
+
+Use the [Discord setup instructions](../README.md#add-the-optional-command-bot-to-your-discord) to create/invite your own bot or configure a webhook. Rust+ credentials must come from your own valid pairing; headless Steam login and automatic desktop credential export are not implemented.
+
+To change the installed settings:
 
 ```sh
-cd BetterRustPlus.Server/deploy
-docker compose logs --tail=50 alerts
+sudo nano /etc/betterrustplus/listener.env
+sudo systemctl restart betterrustplus
 ```
 
-The container restarts after process failures or Docker restarts using `unless-stopped`. Its API port is only available on the VPS itself; the paired source and bot make outgoing connections, so this setup does not require a domain or public web port.
+After verifying the source, destination and rules, set `Alerts__DryRun=false` for real event messages. For raid pings, enable only `Alerts__Rules__1__MentionEveryone=true` and give the Discord sender the required permission. Keep the installed settings file owned by root with mode 600. Editing the checkout's `.env` after installation does not change the installed settings.
 
-## 4. Enable real alerts after testing
+Discord can deliver alerts to your phone according to its notification settings. Alexa is not configured here. Airdrop/Deep Sea detection still requires a verified source; exact unobserved death locations and durable delivery are not implemented. See the [feature checklist](../../docs/BETTERRUSTPLUS-FEATURES.md).
 
-Use the [service guide](../README.md#add-the-optional-command-bot-to-your-discord) to create/invite your own bot, or configure a channel webhook. Rust+ values must come from your own valid pairing; the wizard does not perform a Steam login on the VPS or export desktop credentials automatically.
+## Updates
 
-After checking the paired source, rules and destination, edit `BetterRustPlus.Server/deploy/.env` privately and set `Alerts__DryRun=false`. To ping everyone for raids, change only `Alerts__Rules__1__MentionEveryone=true` and grant the sender the relevant Discord permission. Recreate the service with `--start` to apply changes. This enables real messages.
+Keep a protected backup of `/etc/betterrustplus/listener.env`. Pull the intended reviewed branch as your normal user, then install the new release:
 
-Discord can deliver the alerts to your phone according to its notification settings. Alexa is not configured by this wizard. Universal airdrop/Deep Sea detection, durable delivery and exact unobserved death positions are not implemented; see the [feature checklist](../../docs/BETTERRUSTPLUS-FEATURES.md).
+```sh
+git pull --ff-only
+sudo python3 BetterRustPlus.Server/deploy/setup.py --install
+```
 
-The source code and private `.env` remain separate. Before updates, keep a protected backup of `.env`. A restart resets this development version's in-memory cooldown/retry history.
+The installer builds before changing the selected release and preserves installed settings. Old releases are retained for recovery; they are not automatically deleted. Runtime cooldown/retry history is currently memory-only and resets on restart.

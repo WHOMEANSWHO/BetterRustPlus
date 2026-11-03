@@ -60,7 +60,7 @@ public static class DiscordBotCommands
 
     private static string Rules(AlertOptions alerts)
     {
-        if (alerts.Rules.Count == 0) return "No alert rules are configured. Configure the VPS service and recreate its container to apply changes.";
+        if (alerts.Rules.Count == 0) return "No alert rules are configured. Update the VPS service settings and restart BetterRustPlus to apply changes.";
         var text = new StringBuilder("Configured BetterRustPlus alert rules\n");
         text.AppendLine(alerts.DryRun ? "Dry-run is ON; alerts are simulated." : "Live delivery is enabled.");
         int shown = 0;
