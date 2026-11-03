@@ -6,6 +6,10 @@
 **/*.suo
 *.cache
 *.log
+**/__pycache__/
+*.py[cod]
+BetterRustPlus.Server/deploy/.betterrustplus-*
+BetterRustPlus.Server/deploy/.setup-test-tmp/
 /graphify-out/
 # Publish-Output (dotnet publish)
 **/publish/

@@ -17,6 +17,8 @@ There is no universal airdrop/Deep Sea detector, Steam friends/server-presence i
 
 ## Keep the service running on a VPS
 
+**Start here:** the [guided VPS setup](deploy/README.md) downloads only the listener, creates private settings, and walks through optional Rust+ and Discord configuration. Run `python3 BetterRustPlus.Server/deploy/setup.py` from the repository folder. Manual setup details follow for advanced configuration.
+
 The service can run while every desktop is off. Leave the paired source disabled for supplied-event testing, or configure it to poll the group's own paired server. Hosting does not grant additional game data: raids mean configured paired Smart Alarm transitions, deaths use available team state, and airdrop/Deep Sea events still require another verified producer. `/health` reports disabled, connecting, connected, degraded and disconnected states plus freshness; liveness alone is not proof of a game connection. A successful team poll becomes stale after the configured polling interval plus 60 seconds.
 
 Use a Linux VPS with Docker Engine and the Compose plugin installed. Enable Docker at boot using your host's service manager. From this repository's `BetterRustPlus.Server/deploy` folder:
